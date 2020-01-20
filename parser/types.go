@@ -96,7 +96,7 @@ type FPackageFileSummary struct {
 	Tag                         int32                   `json:"tag"`
 	LegacyFileVersion           int32                   `json:"legacy_file_version"`
 	LegacyUE3Version            int32                   `json:"legacy_ue_3_version"`
-	FileVersionU34              int32                   `json:"file_version_u_34"`
+	FileVersionUE4              int32                   `json:"file_version_ue_4"`
 	FileVersionLicenseeUE4      int32                   `json:"file_version_licensee_ue_4"`
 	TotalHeaderSize             int32                   `json:"total_header_size"`
 	FolderName                  string                  `json:"folder_name"`
@@ -120,7 +120,7 @@ type FPackageFileSummary struct {
 	PackageSource               uint32                  `json:"package_source"`
 	AdditionalPackagesToCook    []string                `json:"additional_packages_to_cook"`
 	AssetRegistryDataOffset     int32                   `json:"asset_registry_data_offset"`
-	BuldDataStartOffset         int32                   `json:"buld_data_start_offset"`
+	BulkDataStartOffset         int32                   `json:"bulk_data_start_offset"`
 	WorldTileInfoDataOffset     int32                   `json:"world_tile_info_data_offset"`
 	ChunkIds                    []int32                 `json:"chunk_ids"`
 	PreloadDependencyCount      int32                   `json:"preload_dependency_count"`
@@ -150,17 +150,9 @@ type StructProperty struct {
 	Guid *FGuid `json:"guid"`
 }
 
-type SoftObjectProperty struct {
+type FSoftObjectPath struct {
 	AssetPathName string `json:"asset_path_name"`
 	SubPath       string `json:"sub_path"`
-}
-
-type TextProperty struct {
-	Flags        uint32 `json:"flags"`
-	HistoryType  int8   `json:"history_type"`
-	Namespace    string `json:"namespace"`
-	Key          string `json:"key"`
-	SourceString string `json:"source_string"`
 }
 
 type FEngineVersion struct {
@@ -181,4 +173,26 @@ type FCompressedChunk struct {
 	UncompressedSize   int32 `json:"uncompressed_size"`
 	CompressedOffset   int32 `json:"compressed_offset"`
 	CompressedSize     int32 `json:"compressed_size"`
+}
+
+type MapProperty struct {
+	KeyType   string `json:"key_type"`
+	ValueType string `json:"value_type"`
+}
+
+type UInterfaceProperty struct {
+	InterfaceNumber uint32 `json:"interface_number"`
+}
+
+type FText struct {
+	Flags        uint32 `json:"flags"`
+	HistoryType  int8   `json:"history_type"`
+	Namespace    string `json:"namespace"`
+	Key          string `json:"key"`
+	SourceString string `json:"source_string"`
+}
+
+type FScriptDelegate struct {
+	Object int32  `json:"object"`
+	Name   string `json:"name"`
 }

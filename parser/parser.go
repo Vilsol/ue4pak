@@ -2,6 +2,7 @@ package parser
 
 import (
 	"encoding/binary"
+	"fmt"
 	"github.com/Vilsol/ue4pak/utils"
 	"math"
 	"os"
@@ -27,21 +28,25 @@ func Parse(file *os.File) *PakFile {
 	index := make([]byte, pakFooter.IndexSize)
 	file.Read(index)
 
-	mountPointLength := binary.LittleEndian.Uint32(index[0:4])
+	offset := uint32(0)
+
+	mountPoint, tempOffset := ReadString(index[offset:])
+	offset += tempOffset
+
+	recordCount := binary.LittleEndian.Uint32(index[offset:])
+	offset += 4
+
 	pakIndex := &FPakIndex{
-		MountPoint: string(index[4:mountPointLength]),
-		Records:    make([]*FPakEntry, binary.LittleEndian.Uint32(index[4+mountPointLength:])),
+		MountPoint: mountPoint,
+		Records:    make([]*FPakEntry, recordCount),
 	}
 
-	offset := 4 + mountPointLength + 4
 	for i := 0; i < len(pakIndex.Records); i++ {
 		pakIndex.Records[i] = &FPakEntry{}
 
-		fileNameLength := binary.LittleEndian.Uint32(index[offset:])
-		offset += 4
-
-		pakIndex.Records[i].FileName = string(index[offset : offset+fileNameLength])
-		offset += fileNameLength
+		var tempOffset uint32
+		pakIndex.Records[i].FileName, tempOffset = ReadString(index[offset:])
+		offset += tempOffset
 
 		pakIndex.Records[i].FileOffset = binary.LittleEndian.Uint64(index[offset:])
 		offset += 8
@@ -114,10 +119,10 @@ func (record *FPakEntry) ReadUAsset(file *os.File) *FPackageFileSummary {
 	legacyFileVersion := utils.Int32(fileData[offset:])
 	offset += 4
 
-	legacyyUE3Version := utils.Int32(fileData[offset:])
+	legacyUE3Version := utils.Int32(fileData[offset:])
 	offset += 4
 
-	fileVersionU34 := utils.Int32(fileData[offset:])
+	fileVersionUE4 := utils.Int32(fileData[offset:])
 	offset += 4
 
 	fileVersionLicenseeUE4 := utils.Int32(fileData[offset:])
@@ -129,11 +134,8 @@ func (record *FPakEntry) ReadUAsset(file *os.File) *FPackageFileSummary {
 	totalHeaderSize := utils.Int32(fileData[offset:])
 	offset += 4
 
-	folderNameLength := binary.LittleEndian.Uint32(fileData[offset:])
-	offset += 4
-
-	folderName := string(fileData[offset : offset+folderNameLength])
-	offset += folderNameLength
+	folderName, tempOffset := ReadString(fileData[offset:])
+	offset += tempOffset
 
 	packageFlags := binary.LittleEndian.Uint32(fileData[offset:])
 	offset += 4
@@ -217,17 +219,15 @@ func (record *FPakEntry) ReadUAsset(file *os.File) *FPackageFileSummary {
 
 	additionalPackagesToCook := make([]string, additionalPackageCount)
 	for i := uint32(0); i < additionalPackageCount; i++ {
-		packageLength := binary.LittleEndian.Uint32(fileData[offset:])
-		offset += 4
-
-		additionalPackagesToCook[i] = string(fileData[offset : offset+packageLength])
-		offset += packageLength
+		var tempOffset uint32
+		additionalPackagesToCook[i], tempOffset = ReadString(fileData[offset:])
+		offset += tempOffset
 	}
 
 	assetRegistryDataOffset := utils.Int32(fileData[offset:])
 	offset += 4
 
-	buldDataStartOffset := utils.Int32(fileData[offset:])
+	bulkDataStartOffset := utils.Int32(fileData[offset:])
 	offset += 4
 
 	worldTileInfoDataOffset := utils.Int32(fileData[offset:])
@@ -253,16 +253,15 @@ func (record *FPakEntry) ReadUAsset(file *os.File) *FPackageFileSummary {
 
 	names := make([]*FNameEntrySerialized, nameCount)
 	for i := uint32(0); i < nameCount; i++ {
-		strLen := binary.LittleEndian.Uint32(fileData[offset:])
-		offset += 4
+		name, tempOffset := ReadString(fileData[offset:])
+		offset += tempOffset
 
 		names[i] = &FNameEntrySerialized{
-			Name:                  string(fileData[offset : offset+strLen]),
-			NonCasePreservingHash: binary.LittleEndian.Uint16(fileData[offset+strLen:]),
-			CasePreservingHash:    binary.LittleEndian.Uint16(fileData[offset+strLen:]),
+			Name:                  name,
+			NonCasePreservingHash: binary.LittleEndian.Uint16(fileData[offset:]),
+			CasePreservingHash:    binary.LittleEndian.Uint16(fileData[offset+2:]),
 		}
 
-		offset += strLen
 		offset += 4
 	}
 
@@ -379,8 +378,8 @@ func (record *FPakEntry) ReadUAsset(file *os.File) *FPackageFileSummary {
 	return &FPackageFileSummary{
 		Tag:                         tag,
 		LegacyFileVersion:           legacyFileVersion,
-		LegacyUE3Version:            legacyyUE3Version,
-		FileVersionU34:              fileVersionU34,
+		LegacyUE3Version:            legacyUE3Version,
+		FileVersionUE4:              fileVersionUE4,
 		FileVersionLicenseeUE4:      fileVersionLicenseeUE4,
 		TotalHeaderSize:             totalHeaderSize,
 		FolderName:                  folderName,
@@ -404,7 +403,7 @@ func (record *FPakEntry) ReadUAsset(file *os.File) *FPackageFileSummary {
 		PackageSource:               packageSource,
 		AdditionalPackagesToCook:    additionalPackagesToCook,
 		AssetRegistryDataOffset:     assetRegistryDataOffset,
-		BuldDataStartOffset:         buldDataStartOffset,
+		BulkDataStartOffset:         bulkDataStartOffset,
 		WorldTileInfoDataOffset:     worldTileInfoDataOffset,
 		ChunkIds:                    chunkIds,
 		PreloadDependencyCount:      preloadDependencyCount,
@@ -552,23 +551,26 @@ func ReadFPropertyTag(data []byte, imports []*FObjectImport, exports []*FObjectE
 		offset += 1
 		break
 	case "EnumProperty":
-		tagData, tempOffset = ReadFName(data[offset:], names)
-		offset += tempOffset
-		break
+		fallthrough
 	case "ByteProperty":
-		tagData, tempOffset = ReadFName(data[offset:], names)
-		offset += tempOffset
-		break
+		fallthrough
+	case "SetProperty":
+		fallthrough
 	case "ArrayProperty":
 		tagData, tempOffset = ReadFName(data[offset:], names)
 		offset += tempOffset
 		break
 	case "MapProperty":
-		panic("Reading MapProperty not implemented") // TODO Read MapProperty
-		break
-	case "SetProperty":
-		tagData, tempOffset = ReadFName(data[offset:], names)
+		keyType, tempOffset := ReadFName(data[offset:], names)
 		offset += tempOffset
+
+		valueType, tempOffset := ReadFName(data[offset:], names)
+		offset += tempOffset
+
+		tagData = &MapProperty{
+			KeyType:   keyType,
+			ValueType: valueType,
+		}
 		break
 	}
 
@@ -612,9 +614,10 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 		break
 	case "ArrayProperty":
 		arrayTypes := strings.Trim(tagData.(string), "\x00")
-
 		valueCount := utils.Int32(data[offset:])
 		offset += 4
+
+		bufferLength := len(data[offset:])
 
 		var innerTagData *FPropertyTag
 
@@ -630,13 +633,10 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 				assetPathName, tempOffset := ReadFName(data[offset:], names)
 				offset += tempOffset
 
-				subPathLength := binary.LittleEndian.Uint32(data[offset:])
-				offset += 4
+				subPath, tempOffset := ReadString(data[offset:])
+				offset += tempOffset
 
-				subPath := string(data[offset : offset+subPathLength])
-				offset += subPathLength
-
-				values[i] = &SoftObjectProperty{
+				values[i] = &FSoftObjectPath{
 					AssetPathName: assetPathName,
 					SubPath:       subPath,
 				}
@@ -653,8 +653,52 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 				values[i] = data[offset] != 0
 				offset += 1
 				break
+			case "ByteProperty":
+				if int32(bufferLength)/valueCount == 1 {
+					values[i] = uint8(data[offset])
+					offset += 1
+				} else {
+					values[i], tempOffset = ReadFName(data[offset:], names)
+					offset += tempOffset
+				}
+				break
+			case "NameProperty":
+				fallthrough
+			case "EnumProperty":
+				values[i], tempOffset = ReadFName(data[offset:], names)
+				offset += tempOffset
+				break
+			case "IntProperty":
+				values[i] = utils.Int32(data[offset:])
+				offset += 4
+				break
+			case "FloatProperty":
+				values[i] = utils.Float32(data[offset:])
+				offset += 4
+				break
+			case "TextProperty":
+				values[i], tempOffset = ReadFText(data[offset:])
+				offset += tempOffset
+				break
+			case "StrProperty":
+				values[i], tempOffset = ReadString(data[offset:])
+				offset += tempOffset
+				break
+			case "DelegateProperty":
+				object := utils.Int32(data[offset:])
+				offset += 4
+
+				name, tempOffset := ReadFName(data[offset:], names)
+				offset += tempOffset
+
+				values[i] = &FScriptDelegate{
+					Object: object,
+					Name:   name,
+				}
+				break
 			default:
-				panic("unknown type:" + arrayTypes)
+				fmt.Println(utils.HexDump(data[offset:]))
+				panic("unknown type: " + arrayTypes)
 			}
 		}
 
@@ -686,6 +730,54 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 				case "Vector2D":
 					fallthrough
 				case "ColorMaterialInput":
+					fallthrough
+				case "Color":
+					fallthrough
+				case "Quat":
+					fallthrough
+				case "Box":
+					fallthrough
+				case "PerPlatformFloat":
+					fallthrough
+				case "SkeletalMeshSamplingLODBuiltData":
+					fallthrough
+				case "PointerToUberGraphFrame":
+					fallthrough
+				case "MovieSceneFrameRange":
+					fallthrough
+				case "FrameNumber":
+					fallthrough
+				case "MovieSceneSegmentIdentifier":
+					fallthrough
+				case "MovieSceneSequenceID":
+					fallthrough
+				case "MovieSceneTrackIdentifier":
+					fallthrough
+				case "MovieSceneEvaluationKey":
+					fallthrough
+				case "Box2D":
+					fallthrough
+				case "Vector4":
+					fallthrough
+				case "FontData":
+					fallthrough
+				case "FontCharacter":
+					fallthrough
+				case "MaterialAttributesInput":
+					fallthrough
+				case "MovieSceneByteChannel":
+					fallthrough
+				case "MovieSceneEventParameters":
+					fallthrough
+				case "SoftClassPath":
+					fallthrough
+				case "MovieSceneParticleChannel":
+					fallthrough
+				case "InventoryItem":
+					fallthrough
+				case "SmartName":
+					fallthrough
+				case "PerPlatformInt":
 					// TODO Read types correctly
 					offset = uint32(len(data))
 					break
@@ -719,50 +811,17 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 		tag = utils.Int32(data[offset : offset+4])
 		offset += 4
 		break
+	case "Int8Property":
+		tag = int8(data[offset])
+		offset += 1
+		break
 	case "ObjectProperty":
 		tag = ReadFPackageIndex(data[offset:], imports, exports)
 		offset += 4
 		break
 	case "TextProperty":
-		flags := binary.LittleEndian.Uint32(data[offset:])
-		offset += 4
-
-		historyType := int8(data[offset])
-		offset += 1
-
-		if historyType == -1 {
-			tag = &TextProperty{
-				Flags:       flags,
-				HistoryType: historyType,
-			}
-			break
-		}
-
-		namespaceLength := binary.LittleEndian.Uint32(data[offset:])
-		offset += 4
-
-		namespace := string(data[offset : offset+namespaceLength])
-		offset += namespaceLength
-
-		keyLength := binary.LittleEndian.Uint32(data[offset:])
-		offset += 4
-
-		key := string(data[offset : offset+keyLength])
-		offset += keyLength
-
-		sourceStringLength := binary.LittleEndian.Uint32(data[offset:])
-		offset += 4
-
-		sourceString := string(data[offset : offset+sourceStringLength])
-		offset += sourceStringLength
-
-		tag = &TextProperty{
-			Flags:        flags,
-			HistoryType:  historyType,
-			Namespace:    namespace,
-			Key:          key,
-			SourceString: sourceString,
-		}
+		tag, tempOffset = ReadFText(data[offset:])
+		offset += tempOffset
 		break
 	case "BoolProperty":
 		// No extra data
@@ -771,30 +830,44 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 		tag, tempOffset = ReadFName(data[offset:], names)
 		offset += tempOffset
 		break
+	case "StrProperty":
+		tag, tempOffset = ReadString(data[offset:])
+		offset += tempOffset
+		break
+	case "UInt32Property":
+		tag = binary.LittleEndian.Uint32(data[offset:])
+		offset += 4
+		break
 	case "UInt64Property":
 		tag = binary.LittleEndian.Uint64(data[offset:])
 		offset += 8
+		break
+	case "InterfaceProperty":
+		tag = &UInterfaceProperty{
+			InterfaceNumber: binary.LittleEndian.Uint32(data[offset:]),
+		}
+		offset += 4
 		break
 	case "ByteProperty":
 		if len(data[offset:]) == 4 {
 			tag = binary.LittleEndian.Uint32(data[offset:])
 			offset += 4
-		} else {
+		} else if len(data[offset:]) >= 8 {
 			tag, tempOffset = ReadFName(data[offset:], names)
 			offset += tempOffset
+		} else {
+			tag = data[offset]
+			offset += 1
 		}
 		break
 	case "SoftObjectProperty":
 		assetPathName, tempOffset := ReadFName(data[offset:], names)
 		offset += tempOffset
 
-		subPathLength := binary.LittleEndian.Uint32(data[offset:])
-		offset += 4
+		subPath, tempOffset := ReadString(data[offset:])
+		offset += tempOffset
 
-		subPath := string(data[offset : offset+subPathLength])
-		offset += subPathLength
-
-		tag = &SoftObjectProperty{
+		tag = &FSoftObjectPath{
 			AssetPathName: assetPathName,
 			SubPath:       subPath,
 		}
@@ -808,6 +881,10 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 		} else {
 			panic("unknown state!")
 		}
+		break
+	case "MapProperty":
+		// TODO Read MapProperty
+		offset += uint32(len(data)) - offset
 		break
 	default:
 		if offset < uint32(len(data)-1) {
@@ -843,11 +920,8 @@ func ReadFEngineVersion(data []byte) (*FEngineVersion, uint32) {
 	changeList := binary.LittleEndian.Uint32(data[offset:])
 	offset += 4
 
-	branchLength := binary.LittleEndian.Uint32(data[offset:])
-	offset += 4
-
-	branch := string(data[offset : offset+branchLength])
-	offset += branchLength
+	branch, tempOffset := ReadString(data[offset:])
+	offset += tempOffset
 
 	return &FEngineVersion{
 		Major:      major,
@@ -894,4 +968,61 @@ func ReadFCompressedChunk(data []byte) (*FCompressedChunk, uint32) {
 		CompressedOffset:   compressedOffset,
 		CompressedSize:     compressedSize,
 	}, offset
+}
+
+func ReadFText(data []byte) (*FText, uint32) {
+	offset := uint32(0)
+
+	flags := binary.LittleEndian.Uint32(data)
+	offset += 4
+
+	historyType := int8(data[offset])
+	offset += 1
+
+	if historyType == -1 {
+		return &FText{
+			Flags:       flags,
+			HistoryType: historyType,
+		}, offset
+	}
+
+	namespace, tempOffset := ReadString(data[offset:])
+	offset += tempOffset
+
+	key, tempOffset := ReadString(data[offset:])
+	offset += tempOffset
+
+	sourceString, tempOffset := ReadString(data[offset:])
+	offset += tempOffset
+
+	return &FText{
+		Flags:        flags,
+		HistoryType:  historyType,
+		Namespace:    namespace,
+		Key:          key,
+		SourceString: sourceString,
+	}, offset
+}
+
+func ReadString(data []byte) (string, uint32) {
+	offset := uint32(0)
+
+	stringLength := utils.Int32(data[offset:])
+	offset += 4
+
+	if stringLength > int32(len(data[offset:])) {
+		fmt.Println(utils.HexDump(data))
+		panic("string length longer than data buffer")
+	}
+
+	if stringLength == 0 {
+		return "", 4
+	}
+
+	if stringLength < 0 {
+		stringLength = (stringLength * -1) * 2
+		return utils.DecodeUtf16(data[offset : offset+uint32(stringLength)]), offset + uint32(stringLength)
+	}
+
+	return string(data[offset : offset+uint32(stringLength)]), offset + uint32(stringLength)
 }

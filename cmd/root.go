@@ -21,6 +21,6 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&PakFile, "pak", "p", "", "The pak file (required)")
-	rootCmd.MarkFlagRequired("pak")
+	rootCmd.PersistentFlags().StringVarP(&PakFile, "pak", "p", "", "The path to pak file (supports glob) (required)")
+	rootCmd.MarkPersistentFlagRequired("pak")
 }

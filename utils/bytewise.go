@@ -1,11 +1,13 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"github.com/fatih/color"
 	"math"
 	"strconv"
+	"unicode/utf16"
 )
 
 func Int16(b []byte) int16 {
@@ -22,6 +24,11 @@ func Int64(b []byte) int64 {
 	_ = b[7] // bounds check hint to compiler; see golang.org/issue/14808
 	return int64(b[0]) | int64(b[1])<<8 | int64(b[2])<<16 | int64(b[3])<<24 |
 		int64(b[4])<<32 | int64(b[5])<<40 | int64(b[6])<<48 | int64(b[7])<<56
+}
+
+func Float32(b []byte) float32 {
+	_ = b[3] // bounds check hint to compiler; see golang.org/issue/14808
+	return math.Float32frombits(binary.LittleEndian.Uint32(b[:4]))
 }
 
 func safeChar(char byte) string {
@@ -108,4 +115,10 @@ func IsLengthPrefixedNullTerminatedString(data []byte) bool {
 	}
 
 	return true
+}
+
+func DecodeUtf16(b []byte) string {
+	ints := make([]uint16, len(b)/2)
+	binary.Read(bytes.NewReader(b), binary.LittleEndian, &ints)
+	return string(utf16.Decode(ints))
 }
