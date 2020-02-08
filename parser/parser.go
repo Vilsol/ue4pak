@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"github.com/Vilsol/ue4pak/utils"
 	"math"
-	"os"
 	"strings"
 )
 
-func Parse(file *os.File) *PakFile {
+func Parse(file PakReader) *PakFile {
 	// Seek and read the footer of the file
 	file.Seek(-44, 2)
 	footer := make([]byte, 44)
@@ -102,7 +101,7 @@ func Parse(file *os.File) *PakFile {
 	}
 }
 
-func (record *FPakEntry) ReadUAsset(file *os.File) *FPackageFileSummary {
+func (record *FPakEntry) ReadUAsset(file PakReader) *FPackageFileSummary {
 	// Skip UE4 pak header
 	// TODO Find out what's in the pak header
 	headerSize := int64(53)
@@ -414,7 +413,7 @@ func (record *FPakEntry) ReadUAsset(file *os.File) *FPackageFileSummary {
 	}
 }
 
-func (record *FPakEntry) ReadUExp(file *os.File, uAsset *FPackageFileSummary) map[*FObjectExport][]*FPropertyTag {
+func (record *FPakEntry) ReadUExp(file PakReader, uAsset *FPackageFileSummary) map[*FObjectExport][]*FPropertyTag {
 	// Skip UE4 pak header
 	// TODO Find out what's in the pak header
 	headerSize := int64(53)
