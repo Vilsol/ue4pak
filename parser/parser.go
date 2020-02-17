@@ -4,14 +4,106 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/Vilsol/ue4pak/utils"
+	log "github.com/sirupsen/logrus"
 	"math"
 	"strings"
 )
 
+func ProcessPak(file PakReader, parseFile func(string) bool) ([]*PakEntrySet, *PakFile) {
+	pak := Parse(file)
+
+	results := make([]*PakEntrySet, 0)
+
+	summaries := make(map[string]*FPackageFileSummary, 0)
+
+	// First pass, parse summaries
+	for j, record := range pak.Index.Records {
+		trimmed := strings.Trim(record.FileName, "\x00")
+
+		if parseFile != nil {
+			if !parseFile(trimmed) {
+				continue
+			}
+		}
+
+		if strings.HasSuffix(trimmed, "uasset") {
+			offset := record.FileOffset + pak.Footer.HeaderSize()
+			log.Infof("Reading Record: %d [%x-%x]: %s\n", j, offset, offset+record.FileSize, trimmed)
+			summaries[trimmed[0:strings.Index(trimmed, ".uasset")]] = record.ReadUAsset(pak, file)
+			summaries[trimmed[0:strings.Index(trimmed, ".uasset")]].Record = record
+		}
+	}
+
+	// Second pass, parse exports
+	for j, record := range pak.Index.Records {
+		trimmed := strings.Trim(record.FileName, "\x00")
+
+		if parseFile != nil {
+			if !parseFile(trimmed) {
+				continue
+			}
+		}
+
+		if strings.HasSuffix(trimmed, "uexp") {
+			summary, ok := summaries[trimmed[0:strings.Index(trimmed, ".uexp")]]
+
+			offset := record.FileOffset + pak.Footer.HeaderSize()
+
+			if !ok {
+				log.Errorf("Unable to read record. Missing uasset: %d [%x-%x]: %s\n", j, offset, offset+record.FileSize, trimmed)
+				continue
+			}
+
+			log.Infof("Reading Record: %d [%x-%x]: %s\n", j, offset, offset+record.FileSize, trimmed)
+
+			exports := record.ReadUExp(pak, file, summary)
+
+			exportSet := make([]PakExportSet, len(exports))
+
+			i := 0
+			for export, properties := range exports {
+				exportSet[i] = PakExportSet{
+					Export:     export,
+					Properties: properties,
+				}
+				i++
+			}
+
+			results = append(results, &PakEntrySet{
+				ExportRecord: record,
+				Summary:      summary,
+				Exports:      exportSet,
+			})
+		}
+	}
+
+	return results, pak
+}
+
 func Parse(file PakReader) *PakFile {
+	// Find magic number
+	magicOffset := int64(-44)
+
+	for {
+		file.Seek(magicOffset, 2)
+
+		magicArray := make([]byte, 4)
+		file.Read(magicArray)
+
+		if magicArray[0] == 0xE1 && magicArray[1] == 0x12 && magicArray[2] == 0x6F && magicArray[3] == 0x5A {
+			break
+		}
+
+		magicOffset -= 1
+
+		if magicOffset < -1024 {
+			log.Fatal("Could not find magic bytes in pak!")
+		}
+	}
+
 	// Seek and read the footer of the file
-	file.Seek(-44, 2)
-	footer := make([]byte, 44)
+	file.Seek(magicOffset, 2)
+	footer := make([]byte, magicOffset*-1)
 	file.Read(footer)
 
 	pakFooter := &FPakInfo{
@@ -19,7 +111,7 @@ func Parse(file PakReader) *PakFile {
 		Version:       binary.LittleEndian.Uint32(footer[4:8]),
 		IndexOffset:   binary.LittleEndian.Uint64(footer[8:16]),
 		IndexSize:     binary.LittleEndian.Uint64(footer[16:24]),
-		IndexSHA1Hash: footer[24:],
+		IndexSHA1Hash: footer[24:44],
 	}
 
 	// Seek and read the index of the file
@@ -56,8 +148,13 @@ func Parse(file PakReader) *PakFile {
 		pakIndex.Records[i].UncompressedSize = binary.LittleEndian.Uint64(index[offset:])
 		offset += 8
 
-		pakIndex.Records[i].CompressionMethod = binary.LittleEndian.Uint32(index[offset:])
-		offset += 4
+		if pakFooter.Version >= 8 {
+			pakIndex.Records[i].CompressionMethod = uint32(index[offset])
+			offset += 1
+		} else {
+			pakIndex.Records[i].CompressionMethod = binary.LittleEndian.Uint32(index[offset:])
+			offset += 4
+		}
 
 		if pakFooter.Version <= 1 {
 			pakIndex.Records[i].Timestamp = binary.LittleEndian.Uint64(index[offset:])
@@ -101,10 +198,10 @@ func Parse(file PakReader) *PakFile {
 	}
 }
 
-func (record *FPakEntry) ReadUAsset(file PakReader) *FPackageFileSummary {
+func (record *FPakEntry) ReadUAsset(pak *PakFile, file PakReader) *FPackageFileSummary {
 	// Skip UE4 pak header
 	// TODO Find out what's in the pak header
-	headerSize := int64(53)
+	headerSize := int64(pak.Footer.HeaderSize())
 
 	file.Seek(headerSize+int64(record.FileOffset), 0)
 	fileData := make([]byte, record.FileSize)
@@ -255,6 +352,8 @@ func (record *FPakEntry) ReadUAsset(file PakReader) *FPackageFileSummary {
 		name, tempOffset := ReadString(fileData[offset:])
 		offset += tempOffset
 
+		// fmt.Println(i, name)
+
 		names[i] = &FNameEntrySerialized{
 			Name:                  name,
 			NonCasePreservingHash: binary.LittleEndian.Uint16(fileData[offset:]),
@@ -272,11 +371,13 @@ func (record *FPakEntry) ReadUAsset(file PakReader) *FPackageFileSummary {
 		className, tempOffset := ReadFName(fileData[offset:], names)
 		offset += tempOffset
 
-		outerIndex := binary.LittleEndian.Uint32(fileData[offset:])
+		outerIndex := utils.Int32(fileData[offset:])
 		offset += 4
 
 		objectName, tempOffset := ReadFName(fileData[offset:], names)
 		offset += tempOffset
+
+		// fmt.Println("IMP", objectName)
 
 		imports[i] = &FObjectImport{
 			ClassPackage: classPackage,
@@ -348,6 +449,8 @@ func (record *FPakEntry) ReadUAsset(file PakReader) *FPackageFileSummary {
 		createBeforeCreateDependencies := utils.Int32(fileData[offset:]) != 0
 		offset += 4
 
+		// fmt.Println("EXP", objectName)
+
 		exports[i] = &FObjectExport{
 			ClassIndex:                   classIndex,
 			SuperIndex:                   superIndex,
@@ -371,6 +474,13 @@ func (record *FPakEntry) ReadUAsset(file PakReader) *FPackageFileSummary {
 			CreateBeforeCreateDependencies:               createBeforeCreateDependencies,
 		}
 	}
+
+	for _, objectImport := range imports {
+		objectImport.OuterPackage = ReadFPackageIndexInt(objectImport.OuterIndex, imports, exports)
+	}
+
+	// fmt.Println("UASSET LEFTOVERS:", len(fileData[offset:]))
+	// fmt.Println(utils.HexDump(fileData[offset:]))
 
 	// TODO Bunch of unknown bytes at the end
 
@@ -413,10 +523,10 @@ func (record *FPakEntry) ReadUAsset(file PakReader) *FPackageFileSummary {
 	}
 }
 
-func (record *FPakEntry) ReadUExp(file PakReader, uAsset *FPackageFileSummary) map[*FObjectExport][]*FPropertyTag {
+func (record *FPakEntry) ReadUExp(pak *PakFile, file PakReader, uAsset *FPackageFileSummary) map[*FObjectExport][]*FPropertyTag {
 	// Skip UE4 pak header
 	// TODO Find out what's in the pak header
-	headerSize := int64(53)
+	headerSize := int64(pak.Footer.HeaderSize())
 
 	file.Seek(headerSize+int64(record.FileOffset), 0)
 	fileData := make([]byte, record.FileSize)
@@ -424,10 +534,14 @@ func (record *FPakEntry) ReadUExp(file PakReader, uAsset *FPackageFileSummary) m
 
 	exports := make(map[*FObjectExport][]*FPropertyTag)
 
+	// globalOffset := int64(0)
+
 	for _, export := range uAsset.Exports {
 		headerOffset := export.SerialOffset - int64(uAsset.TotalHeaderSize)
 
 		exportData := fileData[headerOffset : headerOffset+export.SerialSize]
+
+		// globalOffset = headerOffset + export.SerialSize
 
 		offset := uint32(0)
 
@@ -447,10 +561,7 @@ func (record *FPakEntry) ReadUExp(file PakReader, uAsset *FPackageFileSummary) m
 		/*
 			if len(exportData[offset:]) > 4 {
 				fmt.Println()
-				fmt.Printf("%#v\n", export.ClassIndex.Reference)
-				fmt.Printf("%#v\n", export.TemplateIndex.Reference)
-				fmt.Printf("%#v\n", export.SuperIndex.Reference)
-				fmt.Printf("%#v\n", export.OuterIndex.Reference)
+				spew.Dump(export)
 				fmt.Printf("Remaining: %d\n", len(exportData[offset:]))
 
 				if len(exportData[offset:]) < 10000 {
@@ -464,6 +575,9 @@ func (record *FPakEntry) ReadUExp(file PakReader, uAsset *FPackageFileSummary) m
 		exports[export] = properties
 	}
 
+	// fmt.Println("UEXP LEFTOVERS:", len(fileData[globalOffset:]))
+	// fmt.Println(utils.HexDump(fileData[globalOffset:]))
+
 	return exports
 }
 
@@ -472,7 +586,17 @@ func ReadFName(data []byte, names []*FNameEntrySerialized) (string, uint32) {
 }
 
 func ReadFPackageIndex(data []byte, imports []*FObjectImport, exports []*FObjectExport) *FPackageIndex {
-	index := utils.Int32(data)
+	return ReadFPackageIndexInt(utils.Int32(data), imports, exports)
+}
+
+func ReadFPackageIndexInt(index int32, imports []*FObjectImport, exports []*FObjectExport) *FPackageIndex {
+	if index == 0 {
+		// TODO Values of 0 indicate that this resource represents a top-level UPackage object (the linker's LinkerRoot). Serialized
+		return &FPackageIndex{
+			Index:     index,
+			Reference: nil,
+		}
+	}
 
 	if index < 0 {
 		correctedIndex := index*-1 - 1
@@ -489,17 +613,14 @@ func ReadFPackageIndex(data []byte, imports []*FObjectImport, exports []*FObject
 		}
 	}
 
-	if index < int32(len(exports)) {
+	if index-1 < int32(len(exports)) {
 		return &FPackageIndex{
-			Index:     index,
-			Reference: exports[index],
+			Index:     index - 1,
+			Reference: exports[index-1],
 		}
 	}
 
-	return &FPackageIndex{
-		Index:     index,
-		Reference: nil,
-	}
+	return nil
 }
 
 func ReadFGuid(data []byte) *FGuid {
@@ -587,8 +708,9 @@ func ReadFPropertyTag(data []byte, imports []*FObjectImport, exports []*FObjectE
 
 	if readData {
 		tag, tempOffset = ReadTag(data[offset:offset+uint32(size)], imports, exports, names, propertyType, tagData)
-		offset += tempOffset
 	}
+
+	offset += uint32(size)
 
 	return &FPropertyTag{
 		Name:         name,
@@ -777,6 +899,8 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 				case "SmartName":
 					fallthrough
 				case "PerPlatformInt":
+					fallthrough
+				case "MovieSceneFloatValue":
 					// TODO Read types correctly
 					offset = uint32(len(data))
 					break
@@ -978,7 +1102,7 @@ func ReadFText(data []byte) (*FText, uint32) {
 	historyType := int8(data[offset])
 	offset += 1
 
-	if historyType == -1 {
+	if historyType != 0 {
 		return &FText{
 			Flags:       flags,
 			HistoryType: historyType,

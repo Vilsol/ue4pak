@@ -8,26 +8,12 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/gobwas/glob"
 	"github.com/spf13/cobra"
 )
 
 var assets *[]string
-var format *string
-var output *string
-var pretty *bool
-
-type Result struct {
-	Summary *parser.FPackageFileSummary `json:"summary"`
-	Exports []ExportSet                 `json:"exports"`
-}
-
-type ExportSet struct {
-	Export     *parser.FObjectExport  `json:"export"`
-	Properties []*parser.FPropertyTag `json:"properties"`
-}
 
 func init() {
 	assets = extractCmd.Flags().StringSliceP("assets", "a", []string{}, "Comma-separated list of asset paths to extract. (supports glob) (required)")
@@ -57,7 +43,7 @@ var extractCmd = &cobra.Command{
 			patterns[i] = glob.MustCompile(asset)
 		}
 
-		results := make([]*Result, 0)
+		results := make([]*parser.PakEntrySet, 0)
 
 		for _, f := range paks {
 			fmt.Println("Parsing file:", f)
@@ -68,79 +54,17 @@ var extractCmd = &cobra.Command{
 				panic(err)
 			}
 
-			pak := parser.Parse(file)
-
-			summaries := make(map[string]*parser.FPackageFileSummary, 0)
-
-			// First pass, parse summaries
-			for j, record := range pak.Index.Records {
-				trimmed := trim(record.FileName)
-
-				passed := false
-
+			entrySets, _ := parser.ProcessPak(file, func(name string) bool {
 				for _, pattern := range patterns {
-					if pattern.Match(trimmed) {
-						passed = true
-						break
+					if pattern.Match(name) {
+						return true
 					}
 				}
 
-				if !passed {
-					continue
-				}
+				return false
+			})
 
-				if strings.HasSuffix(trimmed, "uasset") {
-					fmt.Printf("Reading Record: %d: %#v\n", j, record)
-					summaries[trimmed[0:strings.Index(trimmed, ".uasset")]] = record.ReadUAsset(file)
-				}
-			}
-
-			// Second pass, parse exports
-			for j, record := range pak.Index.Records {
-				trimmed := trim(record.FileName)
-
-				passed := false
-
-				for _, pattern := range patterns {
-					if pattern.Match(trimmed) {
-						passed = true
-						break
-					}
-				}
-
-				if !passed {
-					continue
-				}
-
-				if strings.HasSuffix(trimmed, "uexp") {
-					summary, ok := summaries[trimmed[0:strings.Index(trimmed, ".uexp")]]
-
-					if !ok {
-						fmt.Printf("Unable to read record. Missing uasset: %d: %#v\n", j, record)
-						continue
-					}
-
-					fmt.Printf("Reading Record: %d: %#v\n", j, record)
-
-					exports := record.ReadUExp(file, summary)
-
-					exportSet := make([]ExportSet, len(exports))
-
-					i := 0
-					for export, properties := range exports {
-						exportSet[i] = ExportSet{
-							Export:     export,
-							Properties: properties,
-						}
-						i++
-					}
-
-					results = append(results, &Result{
-						Summary: summary,
-						Exports: exportSet,
-					})
-				}
-			}
+			results = append(results, entrySets...)
 		}
 
 		var resultBytes []byte

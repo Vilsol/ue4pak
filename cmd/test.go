@@ -36,87 +36,14 @@ var testCmd = &cobra.Command{
 				panic(err)
 			}
 
-			pak := parser.Parse(file)
-
-			summaries := make(map[string]*parser.FPackageFileSummary, 0)
-
-			// First pass, parse summaries
-			for j, record := range pak.Index.Records {
-				trimmed := trim(record.FileName)
-				if strings.HasSuffix(trimmed, "uasset") {
-					fmt.Printf("Reading Record: %d: %#v\n", j, record)
-					summaries[trimmed[0:strings.Index(trimmed, ".uasset")]] = record.ReadUAsset(file)
-
-					/*
-						fmt.Println("\nNames:")
-						for i, name := range lastUasset.Names {
-							fmt.Printf("%#x: %s\n", i, name.Name)
-						}
-
-						fmt.Println("\nImports:")
-						for i, name := range lastUasset.Imports {
-							fmt.Printf("%#x: %#v\n", i, name)
-						}
-
-						fmt.Println("\nExports:")
-						for i, name := range lastUasset.Exports {
-							fmt.Printf("%#x: %#v\n", i, name)
-						}
-					*/
-				}
-			}
-
-			// Second pass, parse exports
-			for j, record := range pak.Index.Records {
-				trimmed := trim(record.FileName)
-				if strings.HasSuffix(trimmed, "uexp") {
-					summary, ok := summaries[trimmed[0:strings.Index(trimmed, ".uexp")]]
-
-					if !ok {
-						fmt.Printf("Unable to read record. Missing uasset: %d: %#v\n", j, record)
-						continue
-					}
-
-					fmt.Printf("Reading Record: %d: %#v\n", j, record)
-
-					record.ReadUExp(file, summary)
-					/*
-						uexp := record.ReadUExp(file, summary)
-
-						for export, properties := range uexp {
-							if export.TemplateIndex.Reference != nil {
-								if imp, ok := export.TemplateIndex.Reference.(*parser.FObjectImport); ok {
-									switch trim(imp.ClassName) {
-									case "FGFactoryConnectionComponent":
-										fallthrough
-									case "FGBuildSubCategory":
-										fallthrough
-									case "FGBuildingDescriptor":
-										fallthrough
-									case "FGBuildableStorage":
-										fallthrough
-									case "FGRecipe":
-										fallthrough
-									case "FGSchematic":
-										fmt.Println()
-										fmt.Printf("%#v\n", export.TemplateIndex.Reference)
-
-										fmt.Println()
-
-										for _, property := range properties {
-											fmt.Printf("%s [%v]: %#v\n", trim(property.Name), property.TagData, property.Tag)
-										}
-
-										fmt.Println()
-
-										break
-									}
-								}
-							}
-						}
-					*/
-				}
-			}
+			parser.ProcessPak(file, nil)
+			/*
+				f, err := os.OpenFile("dump.txt", os.O_WRONLY | os.O_CREATE, 0644)
+				fmt.Println(err)
+				spew.Fdump(f, pak)
+				f.Close()
+				return
+			*/
 		}
 	},
 }

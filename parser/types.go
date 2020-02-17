@@ -1,5 +1,16 @@
 package parser
 
+type PakEntrySet struct {
+	ExportRecord *FPakEntry           `json:"export_record"`
+	Summary      *FPackageFileSummary `json:"summary"`
+	Exports      []PakExportSet       `json:"exports"`
+}
+
+type PakExportSet struct {
+	Export     *FObjectExport  `json:"export"`
+	Properties []*FPropertyTag `json:"properties"`
+}
+
 type FPakInfo struct {
 	Magic         uint32 `json:"magic"`
 	Version       uint32 `json:"version"`
@@ -52,9 +63,9 @@ type FNameEntrySerialized struct {
 type FObjectImport struct {
 	ClassPackage string         `json:"class_package"`
 	ClassName    string         `json:"class_name"`
-	OuterIndex   uint32         `json:"outer_index"`
+	OuterIndex   int32          `json:"outer_index"`
 	ObjectName   string         `json:"object_name"`
-	OuterPackage *FObjectImport `json:"outer_package"`
+	OuterPackage *FPackageIndex `json:"outer_package"`
 }
 
 type FPackageIndex struct {
@@ -93,6 +104,8 @@ type FGuid struct {
 }
 
 type FPackageFileSummary struct {
+	Record *FPakEntry `json:"record"`
+
 	Tag                         int32                   `json:"tag"`
 	LegacyFileVersion           int32                   `json:"legacy_file_version"`
 	LegacyUE3Version            int32                   `json:"legacy_ue_3_version"`
@@ -195,4 +208,12 @@ type FText struct {
 type FScriptDelegate struct {
 	Object int32  `json:"object"`
 	Name   string `json:"name"`
+}
+
+func (pakInfo *FPakInfo) HeaderSize() uint64 {
+	if pakInfo.Version < 8 {
+		return 53
+	}
+
+	return 50
 }
