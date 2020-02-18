@@ -660,6 +660,8 @@ func ReadFPropertyTag(data []byte, imports []*FObjectImport, exports []*FObjectE
 		structType, tempOffset := ReadFName(data[offset:], names)
 		offset += tempOffset
 
+		log.Tracef("StructProperty Type: %s", structType)
+
 		structGuid := ReadFGuid(data[offset:])
 		offset += 16
 
@@ -769,7 +771,7 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 				}
 				break
 			case "StructProperty":
-				log.Debugf("Reading Array StructProperty: %#v", innerTagData.TagData)
+				log.Debugf("Reading Array StructProperty: %s", strings.Trim(innerTagData.TagData.(*StructProperty).Type, "\x00"))
 				var structProperties interface{}
 				structProperties, tempOffset = ReadTag(data[offset:], imports, exports, names, arrayTypes, innerTagData.TagData)
 				offset += tempOffset
@@ -840,8 +842,11 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 
 		break
 	case "StructProperty":
-		log.Debugf("Reading StructProperty: %#v", tagData)
-		if tagData != nil {
+		if tagData == nil {
+			log.Debug("Reading Generic StructProperty")
+		} else {
+			log.Debugf("Reading StructProperty: %s", strings.Trim(tagData.(*StructProperty).Type, "\x00"))
+
 			if structData, ok := tagData.(*StructProperty); ok {
 				switch strings.Trim(structData.Type, "\x00") {
 				case "Guid":
@@ -915,8 +920,17 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 				case "PerPlatformInt":
 					fallthrough
 				case "MovieSceneFloatValue":
+					fallthrough
+				case "MovieSceneSegment":
+					fallthrough
+				case "SectionEvaluationDataTree":
+					fallthrough
+				case "MovieSceneEvalTemplatePtr":
+					fallthrough
+				case "MovieSceneTrackImplementationPtr":
 					// TODO Read types correctly
 					log.Debugf("Unread StructProperty Type: %s", strings.Trim(structData.Type, "\x00"))
+					// fmt.Println(utils.HexDump(data[offset:]))
 					offset = uint32(len(data))
 					break
 				default:
@@ -1021,9 +1035,46 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 		}
 		break
 	case "MapProperty":
-		// TODO Read MapProperty
-		log.Debugf("Unread MapProperty: %#v", tagData)
-		offset += uint32(len(data)) - offset
+		keyType := tagData.(*MapProperty).KeyType
+		valueType := tagData.(*MapProperty).ValueType
+
+		if strings.Trim(keyType, "\x00") == "StructProperty" {
+			// TODO Read MapProperty where StructProperty is key type
+			offset += uint32(len(data)) - offset
+			log.Warningf("Skipping MapProperty: %s -> %s", strings.Trim(keyType, "\x00"), strings.Trim(valueType, "\x00"))
+			break
+		}
+
+		log.Debugf("Reading MapProperty: %s -> %s", strings.Trim(keyType, "\x00"), strings.Trim(valueType, "\x00"))
+
+		numKeysToRemove := binary.LittleEndian.Uint32(data[offset:])
+		offset += 4
+
+		if numKeysToRemove != 0 {
+			// TODO Read MapProperty where numKeysToRemove != 0
+			offset += uint32(len(data)) - offset
+			log.Warningf("Skipping MapProperty: Remove Key Count: %d", numKeysToRemove)
+			break
+		}
+
+		num := utils.Int32(data[offset:])
+		offset += 4
+
+		results := make([]*MapPropertyEntry, num)
+		for i := int32(0); i < num; i++ {
+			key, tempOffset := ReadTag(data[offset:], imports, exports, names, keyType, nil)
+			offset += tempOffset
+
+			value, tempOffset := ReadTag(data[offset:], imports, exports, names, valueType, nil)
+			offset += tempOffset
+
+			results[i] = &MapPropertyEntry{
+				Key:   key,
+				Value: value,
+			}
+		}
+
+		tag = results
 		break
 	default:
 		log.Debugf("Unread Tag Type: %s", strings.Trim(propertyType, "\x00"))

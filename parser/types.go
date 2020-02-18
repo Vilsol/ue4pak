@@ -215,6 +215,11 @@ type ArrayStructProperty struct {
 	Properties   interface{}   `json:"properties"`
 }
 
+type MapPropertyEntry struct {
+	Key   interface{} `json:"key"`
+	Value interface{} `json:"value"`
+}
+
 func (pakInfo *FPakInfo) HeaderSize() uint64 {
 	if pakInfo.Version < 8 {
 		return 53
