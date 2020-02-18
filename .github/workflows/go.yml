@@ -44,27 +44,18 @@ jobs:
           name: ue4pak.exe
           path: .
 
-  release:
-    name: Publish
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    steps:
-
-      - name: Download Linux artifact
-        uses: actions/download-artifact@v1.0.0
-        with:
-          name: ue4pak
-
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v1.0.0
-        with:
-          name: ue4pak.exe
-
-      - name: Release
+      - name: Release Linux
         uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: |
-            ue4pak
-            ue4pak.exe
+          files: ue4pak
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Windows
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ue4pak.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
