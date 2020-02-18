@@ -645,6 +645,8 @@ func ReadFPropertyTag(data []byte, imports []*FObjectImport, exports []*FObjectE
 	propertyType, tempOffset := ReadFName(data[offset:], names)
 	offset += tempOffset
 
+	log.Tracef("Reading Property %s (%s)", strings.Trim(name, "\x00"), strings.Trim(propertyType, "\x00"))
+
 	size := utils.Int32(data[offset:])
 	offset += 4
 
@@ -708,9 +710,13 @@ func ReadFPropertyTag(data []byte, imports []*FObjectImport, exports []*FObjectE
 
 	if readData {
 		tag, tempOffset = ReadTag(data[offset:offset+uint32(size)], imports, exports, names, propertyType, tagData)
-	}
 
-	offset += uint32(size)
+		if tempOffset != uint32(size) {
+			log.Debugf("Property not read to end: %s (%s)", strings.Trim(name, "\x00"), strings.Trim(propertyType, "\x00"))
+		}
+
+		offset += uint32(size)
+	}
 
 	return &FPropertyTag{
 		Name:         name,
@@ -763,8 +769,15 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 				}
 				break
 			case "StructProperty":
-				values[i], tempOffset = ReadTag(data[offset:], imports, exports, names, arrayTypes, innerTagData.TagData)
+				log.Debugf("Reading Array StructProperty: %#v", innerTagData.TagData)
+				var structProperties interface{}
+				structProperties, tempOffset = ReadTag(data[offset:], imports, exports, names, arrayTypes, innerTagData.TagData)
 				offset += tempOffset
+
+				values[i] = &ArrayStructProperty{
+					InnerTagData: innerTagData,
+					Properties:   structProperties,
+				}
 				break
 			case "ObjectProperty":
 				values[i] = ReadFPackageIndex(data[offset:], imports, exports)
@@ -827,6 +840,7 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 
 		break
 	case "StructProperty":
+		log.Debugf("Reading StructProperty: %#v", tagData)
 		if tagData != nil {
 			if structData, ok := tagData.(*StructProperty); ok {
 				switch strings.Trim(structData.Type, "\x00") {
@@ -902,6 +916,7 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 					fallthrough
 				case "MovieSceneFloatValue":
 					// TODO Read types correctly
+					log.Debugf("Unread StructProperty Type: %s", strings.Trim(structData.Type, "\x00"))
 					offset = uint32(len(data))
 					break
 				default:
@@ -1007,21 +1022,15 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 		break
 	case "MapProperty":
 		// TODO Read MapProperty
+		log.Debugf("Unread MapProperty: %#v", tagData)
 		offset += uint32(len(data)) - offset
 		break
 	default:
-		if offset < uint32(len(data)-1) {
-			/*
-				fmt.Println()
-				fmt.Println(tagData)
-				fmt.Println(propertyType, ": MAY BE UNREAD DATA ("+strconv.Itoa(len(data[offset:]))+"):")
-				fmt.Println(utils.HexDump(data[offset:]))
-			*/
+		log.Debugf("Unread Tag Type: %s", strings.Trim(propertyType, "\x00"))
 
-			// TODO Read unknown cases
+		if offset < uint32(len(data)-1) {
 			offset += uint32(len(data)) - offset
 		}
-
 		break
 	}
 

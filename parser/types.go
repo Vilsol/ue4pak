@@ -210,6 +210,11 @@ type FScriptDelegate struct {
 	Name   string `json:"name"`
 }
 
+type ArrayStructProperty struct {
+	InnerTagData *FPropertyTag `json:"inner_tag_data"`
+	Properties   interface{}   `json:"properties"`
+}
+
 func (pakInfo *FPakInfo) HeaderSize() uint64 {
 	if pakInfo.Version < 8 {
 		return 53
