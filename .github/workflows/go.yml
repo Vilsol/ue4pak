@@ -46,7 +46,7 @@ jobs:
 
       - name: Release Linux
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') && runner.os == 'Linux'
         with:
           files: ue4pak
         env:
@@ -54,7 +54,7 @@ jobs:
 
       - name: Release Windows
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') && runner.os == 'Windows'
         with:
           files: ue4pak.exe
         env:
