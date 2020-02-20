@@ -1,5 +1,40 @@
 package parser
 
+var mapPropertyTypeOverrides = map[string]*MapProperty{
+	"BindingIdToReferences": {
+		KeyType:   "Guid",
+		ValueType: "LevelSequenceBindingReferenceArray",
+	},
+	"Tracks": {
+		KeyType:   "MovieSceneTrackIdentifier",
+		ValueType: "MovieSceneEvaluationTrack",
+	},
+	"SubTemplateSerialNumbers": {
+		KeyType:   "MovieSceneSequenceID",
+		ValueType: "UInt32Property",
+	},
+	"SubSequences": {
+		KeyType:   "MovieSceneSequenceID",
+		ValueType: "MovieSceneSubSequenceData",
+	},
+	"Hierarchy": {
+		KeyType:   "MovieSceneSequenceID",
+		ValueType: "MovieSceneSequenceHierarchyNode",
+	},
+	"TrackSignatureToTrackIdentifier": {
+		KeyType:   "Guid",
+		ValueType: "MovieSceneTrackIdentifier",
+	},
+	"SubSectionRanges": {
+		KeyType:   "Guid",
+		ValueType: "MovieSceneFrameRange",
+	},
+}
+
+func RegisterMapPropertyOverride(name string, override *MapProperty) {
+	mapPropertyTypeOverrides[name] = override
+}
+
 type PakEntrySet struct {
 	ExportRecord *FPakEntry           `json:"export_record"`
 	Summary      *FPackageFileSummary `json:"summary"`

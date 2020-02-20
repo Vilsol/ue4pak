@@ -711,7 +711,7 @@ func ReadFPropertyTag(data []byte, imports []*FObjectImport, exports []*FObjectE
 	var tag interface{}
 
 	if readData {
-		tag, tempOffset = ReadTag(data[offset:offset+uint32(size)], imports, exports, names, propertyType, tagData)
+		tag, tempOffset = ReadTag(data[offset:offset+uint32(size)], imports, exports, names, propertyType, tagData, &name)
 
 		if tempOffset != uint32(size) {
 			log.Debugf("Property not read to end: %s (%s)", strings.Trim(name, "\x00"), strings.Trim(propertyType, "\x00"))
@@ -731,7 +731,7 @@ func ReadFPropertyTag(data []byte, imports []*FObjectImport, exports []*FObjectE
 	}, offset
 }
 
-func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, names []*FNameEntrySerialized, propertyType string, tagData interface{}) (interface{}, uint32) {
+func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, names []*FNameEntrySerialized, propertyType string, tagData interface{}, name *string) (interface{}, uint32) {
 	offset := uint32(0)
 
 	var tempOffset uint32
@@ -773,7 +773,7 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 			case "StructProperty":
 				log.Debugf("Reading Array StructProperty: %s", strings.Trim(innerTagData.TagData.(*StructProperty).Type, "\x00"))
 				var structProperties interface{}
-				structProperties, tempOffset = ReadTag(data[offset:], imports, exports, names, arrayTypes, innerTagData.TagData)
+				structProperties, tempOffset = ReadTag(data[offset:], imports, exports, names, arrayTypes, innerTagData.TagData, nil)
 				offset += tempOffset
 
 				values[i] = &ArrayStructProperty{
@@ -1038,10 +1038,32 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 		keyType := tagData.(*MapProperty).KeyType
 		valueType := tagData.(*MapProperty).ValueType
 
-		if strings.Trim(keyType, "\x00") == "StructProperty" {
-			// TODO Read MapProperty where StructProperty is key type
+		var keyData interface{}
+		var valueData interface{}
+
+		realTagData, ok := mapPropertyTypeOverrides[strings.Trim(*name, "\x00")]
+
+		if ok {
+			if strings.Trim(keyType, "\x00") != "StructProperty" {
+				keyType = realTagData.KeyType
+			} else {
+				keyData = &StructProperty{
+					Type: realTagData.KeyType,
+				}
+			}
+
+			if strings.Trim(valueType, "\x00") != "StructProperty" {
+				valueType = realTagData.ValueType
+			} else {
+				valueData = &StructProperty{
+					Type: realTagData.ValueType,
+				}
+			}
+		}
+
+		if strings.Trim(keyType, "\x00") == "StructProperty" && keyData == nil {
 			offset += uint32(len(data)) - offset
-			log.Warningf("Skipping MapProperty: %s -> %s", strings.Trim(keyType, "\x00"), strings.Trim(valueType, "\x00"))
+			log.Warningf("Skipping MapProperty [%s] %s -> %s", strings.Trim(*name, "\x00"), strings.Trim(keyType, "\x00"), strings.Trim(valueType, "\x00"))
 			break
 		}
 
@@ -1062,10 +1084,10 @@ func ReadTag(data []byte, imports []*FObjectImport, exports []*FObjectExport, na
 
 		results := make([]*MapPropertyEntry, num)
 		for i := int32(0); i < num; i++ {
-			key, tempOffset := ReadTag(data[offset:], imports, exports, names, keyType, nil)
+			key, tempOffset := ReadTag(data[offset:], imports, exports, names, keyType, keyData, nil)
 			offset += tempOffset
 
-			value, tempOffset := ReadTag(data[offset:], imports, exports, names, valueType, nil)
+			value, tempOffset := ReadTag(data[offset:], imports, exports, names, valueType, valueData, nil)
 			offset += tempOffset
 
 			results[i] = &MapPropertyEntry{
