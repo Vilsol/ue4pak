@@ -54,7 +54,8 @@ var classTreeCmd = &cobra.Command{
 				panic(err)
 			}
 
-			things, _ := parser.ProcessPak(file, nil)
+			p := parser.NewParser(file)
+			things, _ := p.ProcessPak(nil)
 
 			for _, thing := range things {
 				for _, export := range thing.Exports {

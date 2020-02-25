@@ -36,7 +36,8 @@ var testCmd = &cobra.Command{
 				panic(err)
 			}
 
-			parser.ProcessPak(file, nil)
+			p := parser.NewParser(file)
+			p.ProcessPak(nil)
 			/*
 				f, err := os.OpenFile("dump.txt", os.O_WRONLY | os.O_CREATE, 0644)
 				fmt.Println(err)
