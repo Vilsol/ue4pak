@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Vilsol/ue4pak/utils"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"math"
 	"strings"
 )
@@ -12,6 +13,7 @@ import (
 type PakParser struct {
 	reader  PakReader
 	tracker *readTracker
+	preload []byte
 }
 
 type readTracker struct {
@@ -109,10 +111,9 @@ func (parser *PakParser) Parse() *PakFile {
 	magicOffset := int64(-44)
 
 	for {
-		parser.reader.Seek(magicOffset, 2)
+		parser.Seek(magicOffset, 2)
 
-		magicArray := make([]byte, 4)
-		parser.reader.Read(magicArray)
+		magicArray := parser.Read(4)
 
 		if magicArray[0] == 0xE1 && magicArray[1] == 0x12 && magicArray[2] == 0x6F && magicArray[3] == 0x5A {
 			break
@@ -126,9 +127,8 @@ func (parser *PakParser) Parse() *PakFile {
 	}
 
 	// Seek and read the footer of the file
-	parser.reader.Seek(magicOffset, 2)
-	footer := make([]byte, magicOffset*-1)
-	parser.reader.Read(footer)
+	parser.Seek(magicOffset, 2)
+	footer := parser.Read(int32(magicOffset * -1))
 
 	pakFooter := &FPakInfo{
 		Magic:         binary.LittleEndian.Uint32(footer[0:4]),
@@ -139,7 +139,7 @@ func (parser *PakParser) Parse() *PakFile {
 	}
 
 	// Seek and read the index of the file
-	parser.reader.Seek(int64(pakFooter.IndexOffset), 0)
+	parser.Seek(int64(pakFooter.IndexOffset), 0)
 
 	mountPoint := parser.ReadString()
 	recordCount := parser.ReadUint32()
@@ -210,7 +210,16 @@ func (parser *PakParser) UnTrackRead() {
 	}
 }
 
-func (parser *PakParser) Read(n int32) []byte {
+func (parser *PakParser) Seek(offset int64, whence int) (ret int64, err error) {
+	parser.preload = nil
+	return parser.reader.Seek(offset, whence)
+}
+
+func (parser *PakParser) Preload(n int32) {
+	if viper.GetBool("NoPreload") {
+		return
+	}
+
 	buffer := make([]byte, n)
 	read, err := parser.reader.Read(buffer)
 
@@ -220,6 +229,35 @@ func (parser *PakParser) Read(n int32) []byte {
 
 	if int32(read) < n {
 		panic(fmt.Sprintf("End of stream: %d < %d", read, n))
+	}
+
+	if parser.preload != nil && len(parser.preload) > 0 {
+		parser.preload = append(parser.preload, buffer...)
+	} else {
+		parser.preload = buffer
+	}
+}
+
+func (parser *PakParser) Read(n int32) []byte {
+	toRead := n
+	buffer := make([]byte, toRead)
+
+	if parser.preload != nil && len(parser.preload) > 0 {
+		copied := copy(buffer, parser.preload)
+		parser.preload = parser.preload[copied:]
+		toRead = toRead - int32(copied)
+	}
+
+	if toRead > 0 {
+		read, err := parser.reader.Read(buffer[n-toRead:])
+
+		if err != nil {
+			panic(err)
+		}
+
+		if int32(read) < toRead {
+			panic(fmt.Sprintf("End of stream: %d < %d", read, toRead))
+		}
 	}
 
 	if parser.tracker != nil {
@@ -374,7 +412,8 @@ func (record *FPakEntry) ReadUAsset(pak *PakFile, parser *PakParser) *FPackageFi
 	// TODO Find out what's in the pak header
 	headerSize := int64(pak.Footer.HeaderSize())
 
-	parser.reader.Seek(headerSize+int64(record.FileOffset), 0)
+	parser.Seek(headerSize+int64(record.FileOffset), 0)
+	parser.Preload(int32(record.FileSize))
 
 	tag := parser.ReadInt32()
 	legacyFileVersion := parser.ReadInt32()
@@ -545,7 +584,7 @@ func (record *FPakEntry) ReadUExp(pak *PakFile, parser *PakParser, uAsset *FPack
 
 	for _, export := range uAsset.Exports {
 		log.Debugf("Reading export: %x", headerSize+int64(record.FileOffset)+(export.SerialOffset-int64(uAsset.TotalHeaderSize)))
-		parser.reader.Seek(headerSize+int64(record.FileOffset)+(export.SerialOffset-int64(uAsset.TotalHeaderSize)), 0)
+		parser.Seek(headerSize+int64(record.FileOffset)+(export.SerialOffset-int64(uAsset.TotalHeaderSize)), 0)
 
 		properties := make([]*FPropertyTag, 0)
 
@@ -637,6 +676,7 @@ func (parser *PakParser) ReadFPropertyTag(uAsset *FPackageFileSummary, readData 
 	var tag interface{}
 
 	if readData && size > 0 {
+		parser.Preload(size)
 		parser.TrackRead()
 		tag = parser.ReadTag(size, uAsset, propertyType, tagData, &name, depth)
 

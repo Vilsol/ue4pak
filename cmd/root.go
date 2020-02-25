@@ -4,12 +4,14 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"os"
 )
 
 var PakFile string
 var LogLevel string
 var ForceColors bool
+var NoPreload bool
 
 var rootCmd = &cobra.Command{
 	Use:   "ue4pak",
@@ -26,6 +28,8 @@ var rootCmd = &cobra.Command{
 		})
 		log.SetOutput(os.Stdout)
 		log.SetLevel(level)
+
+		viper.Set("NoPreload", NoPreload)
 	},
 }
 
@@ -40,5 +44,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&PakFile, "pak", "p", "", "The path to pak file (supports glob) (required)")
 	rootCmd.PersistentFlags().StringVar(&LogLevel, "log", "info", "The log level to output")
 	rootCmd.PersistentFlags().BoolVar(&ForceColors, "colors", false, "Force output with colors")
+	rootCmd.PersistentFlags().BoolVar(&NoPreload, "no-preload", false, "Do not preload data (slower, but guaranteed to read)")
 	rootCmd.MarkPersistentFlagRequired("pak")
 }
