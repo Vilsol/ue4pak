@@ -29,7 +29,8 @@ func TestParseAllAsFiles(t *testing.T) {
 			panic(err)
 		}
 
-		pak := parser.Parse(file)
+		p := parser.NewParser(file)
+		pak := p.Parse()
 
 		summaries := make(map[string]*parser.FPackageFileSummary, 0)
 
@@ -38,7 +39,7 @@ func TestParseAllAsFiles(t *testing.T) {
 			trimmed := strings.Trim(record.FileName, "\x00")
 			if strings.HasSuffix(trimmed, "uasset") {
 				fmt.Printf("Reading Record: %d: %#v\n", j, record)
-				summaries[trimmed[0:strings.Index(trimmed, ".uasset")]] = record.ReadUAsset(file)
+				summaries[trimmed[0:strings.Index(trimmed, ".uasset")]] = record.ReadUAsset(pak, p)
 			}
 		}
 
@@ -55,7 +56,7 @@ func TestParseAllAsFiles(t *testing.T) {
 
 				fmt.Printf("Reading Record: %d: %#v\n", j, record)
 
-				record.ReadUExp(file, summary)
+				record.ReadUExp(pak, p, summary)
 			}
 		}
 	}
@@ -83,7 +84,8 @@ func TestParseAllAsBytes(t *testing.T) {
 			Bytes: data,
 		}
 
-		pak := parser.Parse(reader)
+		p := parser.NewParser(reader)
+		pak := p.Parse()
 
 		summaries := make(map[string]*parser.FPackageFileSummary, 0)
 
@@ -92,7 +94,7 @@ func TestParseAllAsBytes(t *testing.T) {
 			trimmed := strings.Trim(record.FileName, "\x00")
 			if strings.HasSuffix(trimmed, "uasset") {
 				fmt.Printf("Reading Record: %d: %#v\n", j, record)
-				summaries[trimmed[0:strings.Index(trimmed, ".uasset")]] = record.ReadUAsset(reader)
+				summaries[trimmed[0:strings.Index(trimmed, ".uasset")]] = record.ReadUAsset(pak, p)
 			}
 		}
 
@@ -109,7 +111,7 @@ func TestParseAllAsBytes(t *testing.T) {
 
 				fmt.Printf("Reading Record: %d: %#v\n", j, record)
 
-				record.ReadUExp(reader, summary)
+				record.ReadUExp(pak, p, summary)
 			}
 		}
 	}
