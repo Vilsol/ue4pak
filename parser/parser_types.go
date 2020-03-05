@@ -306,16 +306,6 @@ func (parser *PakParser) ReadUint64() uint64 {
 	return binary.LittleEndian.Uint64(parser.Read(8))
 }
 
-func (parser *PakParser) ReadFGuid() *FGuid {
-	data := parser.Read(16)
-	return &FGuid{
-		A: binary.LittleEndian.Uint32(data),
-		B: binary.LittleEndian.Uint32(data[4:]),
-		C: binary.LittleEndian.Uint32(data[8:]),
-		D: binary.LittleEndian.Uint32(data[12:]),
-	}
-}
-
 func (parser *PakParser) ReadFGenerationInfo() *FGenerationInfo {
 	return &FGenerationInfo{
 		ExportCount: parser.ReadInt32(),
@@ -583,8 +573,9 @@ func (record *FPakEntry) ReadUExp(pak *PakFile, parser *PakParser, uAsset *FPack
 	exports := make(map[*FObjectExport][]*FPropertyTag)
 
 	for _, export := range uAsset.Exports {
-		log.Debugf("Reading export: %x", headerSize+int64(record.FileOffset)+(export.SerialOffset-int64(uAsset.TotalHeaderSize)))
-		parser.Seek(headerSize+int64(record.FileOffset)+(export.SerialOffset-int64(uAsset.TotalHeaderSize)), 0)
+		offset := headerSize + int64(record.FileOffset) + (export.SerialOffset - int64(uAsset.TotalHeaderSize))
+		log.Debugf("Reading export [%x]: %#v", offset, export.TemplateIndex.Reference)
+		parser.Seek(offset, 0)
 
 		properties := make([]*FPropertyTag, 0)
 
@@ -598,19 +589,18 @@ func (record *FPakEntry) ReadUExp(pak *PakFile, parser *PakParser, uAsset *FPack
 			properties = append(properties, property)
 		}
 
-		/*
-			if len(exportData[offset:]) > 4 {
+		/*if parser.preload != nil {
+			preloadData := parser.preload
+			if len(preloadData) > 0 {
 				fmt.Println()
-				spew.Dump(export)
-				fmt.Printf("Remaining: %d\n", len(exportData[offset:]))
+				// spew.Dump(export)
+				log.Warningf("Export leftovers: %d", len(preloadData))
 
-				if len(exportData[offset:]) < 10000 {
-					fmt.Println(utils.HexDump(exportData[offset:]))
+				if len(preloadData) < 1000 {
+					fmt.Println(utils.HexDump(preloadData))
 				}
-
-				fmt.Println()
 			}
-		*/
+		}*/
 
 		exports[export] = properties
 	}
@@ -681,7 +671,13 @@ func (parser *PakParser) ReadFPropertyTag(uAsset *FPackageFileSummary, readData 
 		tag = parser.ReadTag(size, uAsset, propertyType, tagData, &name, depth)
 
 		if parser.tracker.bytesRead != size {
-			log.Warningf("%sProperty not read correctly: %d read out of %d", d(depth), parser.tracker.bytesRead, size)
+			log.Warningf("%sProperty not read correctly %s (%s)[%#v]: %d read out of %d",
+				d(depth),
+				strings.Trim(name, "\x00"),
+				strings.Trim(propertyType, "\x00"),
+				tagData,
+				parser.tracker.bytesRead,
+				size)
 
 			if parser.tracker.bytesRead > size {
 				log.Fatalf("More bytes read than available!")
@@ -794,96 +790,13 @@ func (parser *PakParser) ReadTag(size int32, uAsset *FPackageFileSummary, proper
 			log.Tracef("%sReading StructProperty: %s", d(depth), strings.Trim(tagData.(*StructProperty).Type, "\x00"))
 
 			if structData, ok := tagData.(*StructProperty); ok {
-				switch strings.Trim(structData.Type, "\x00") {
-				case "Guid":
-					fallthrough
-				case "VectorMaterialInput":
-					fallthrough
-				case "ExpressionInput":
-					fallthrough
-				case "LinearColor":
-					fallthrough
-				case "ScalarMaterialInput":
-					fallthrough
-				case "Vector":
-					fallthrough
-				case "Rotator":
-					fallthrough
-				case "IntPoint":
-					fallthrough
-				case "RichCurveKey":
-					fallthrough
-				case "Vector2D":
-					fallthrough
-				case "ColorMaterialInput":
-					fallthrough
-				case "Color":
-					fallthrough
-				case "Quat":
-					fallthrough
-				case "Box":
-					fallthrough
-				case "PerPlatformFloat":
-					fallthrough
-				case "SkeletalMeshSamplingLODBuiltData":
-					fallthrough
-				case "PointerToUberGraphFrame":
-					fallthrough
-				case "MovieSceneFrameRange":
-					fallthrough
-				case "FrameNumber":
-					fallthrough
-				case "MovieSceneSegmentIdentifier":
-					fallthrough
-				case "MovieSceneSequenceID":
-					fallthrough
-				case "MovieSceneTrackIdentifier":
-					fallthrough
-				case "MovieSceneEvaluationKey":
-					fallthrough
-				case "Box2D":
-					fallthrough
-				case "Vector4":
-					fallthrough
-				case "FontData":
-					fallthrough
-				case "FontCharacter":
-					fallthrough
-				case "MaterialAttributesInput":
-					fallthrough
-				case "MovieSceneByteChannel":
-					fallthrough
-				case "MovieSceneEventParameters":
-					fallthrough
-				case "SoftClassPath":
-					fallthrough
-				case "MovieSceneParticleChannel":
-					fallthrough
-				case "InventoryItem":
-					fallthrough
-				case "SmartName":
-					fallthrough
-				case "PerPlatformInt":
-					fallthrough
-				case "MovieSceneFloatValue":
-					fallthrough
-				case "MovieSceneSegment":
-					fallthrough
-				case "SectionEvaluationDataTree":
-					fallthrough
-				case "MovieSceneEvalTemplatePtr":
-					fallthrough
-				case "MovieSceneTrackImplementationPtr":
-					// TODO Read types correctly
-					log.Debugf("%sUnread StructProperty Type [%d]: %s", d(depth), size, strings.Trim(structData.Type, "\x00"))
-					// fmt.Println(utils.HexDump(data[offset:]))
-					if size > 0 {
-						parser.Read(size)
+				result, success := parser.ReadStruct(structData, size, depth)
+
+				if success {
+					return &StructType{
+						Type:  structData.Type,
+						Value: result,
 					}
-					return tag
-				default:
-					// All others are fine
-					break
 				}
 			}
 		}

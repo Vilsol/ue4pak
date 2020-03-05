@@ -131,13 +131,6 @@ type FObjectExport struct {
 	CreateBeforeCreateDependencies               bool           `json:"create_before_create_dependencies"`
 }
 
-type FGuid struct {
-	A uint32 `json:"a"`
-	B uint32 `json:"b"`
-	C uint32 `json:"c"`
-	D uint32 `json:"d"`
-}
-
 type FPackageFileSummary struct {
 	Record *FPakEntry `json:"record"`
 
