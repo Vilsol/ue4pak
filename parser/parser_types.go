@@ -790,7 +790,7 @@ func (parser *PakParser) ReadTag(size int32, uAsset *FPackageFileSummary, proper
 			log.Tracef("%sReading StructProperty: %s", d(depth), strings.Trim(tagData.(*StructProperty).Type, "\x00"))
 
 			if structData, ok := tagData.(*StructProperty); ok {
-				result, success := parser.ReadStruct(structData, size, depth)
+				result, success := parser.ReadStruct(structData, size, uAsset, depth)
 
 				if success {
 					return &StructType{
