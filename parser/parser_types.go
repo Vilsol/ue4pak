@@ -283,7 +283,9 @@ func (parser *PakParser) ReadString() string {
 }
 
 func (parser *PakParser) ReadFloat32() float32 {
-	return math.Float32frombits(parser.ReadUint32())
+	value := math.Float32frombits(parser.ReadUint32())
+	assertFloat32IsFinite(value)
+	return value
 }
 
 func (parser *PakParser) ReadInt32() int32 {
@@ -948,4 +950,14 @@ func (parser *PakParser) ReadTag(size int32, uAsset *FPackageFileSummary, proper
 
 func d(n int) string {
 	return strings.Repeat("  ", n)
+}
+
+func assertFloat32IsFinite(n float32) {
+	value := float64(n)
+	if math.IsNaN(value) {
+		panic("Expected a float32, but recieved NaN")
+	}
+	if math.IsInf(value, 0) {
+		panic("Expected a float32, but recieved inf")
+	}
 }
