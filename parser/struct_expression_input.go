@@ -1,5 +1,6 @@
 package parser
 
+// https://github.com/SatisfactoryModdingUE/UnrealEngine/blob/4.22-CSS/Engine/Source/Runtime/Engine/Classes/Materials/MaterialExpression.h#L22
 type FExpressionInput struct {
 	Expression     uint32 `json:"expression"`
 	ExpressionName string `json:"expression_name"`
