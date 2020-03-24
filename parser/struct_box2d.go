@@ -1,5 +1,6 @@
 package parser
 
+// https://github.com/SatisfactoryModdingUE/UnrealEngine/blob/4.22-CSS/Engine/Source/Runtime/Core/Public/Math/Box2D.h#L14
 type FBox2D struct {
 	IsValid uint8      `json:"is_valid"`
 	Min     *FVector2D `json:"min"`

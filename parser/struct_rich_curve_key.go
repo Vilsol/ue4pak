@@ -1,5 +1,6 @@
 package parser
 
+// https://github.com/SatisfactoryModdingUE/UnrealEngine/blob/4.22-CSS/Engine/Source/Runtime/Engine/Classes/Curves/RichCurve.h#L74
 type FRichCurveKey struct {
 	InterpMode          uint8   `json:"interp_mode"`
 	TangentMode         uint8   `json:"tangent_mode"`

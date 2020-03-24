@@ -2,11 +2,13 @@ package parser
 
 import "log"
 
+// https://github.com/SatisfactoryModdingUE/UnrealEngine/blob/4.22-CSS/Engine/Source/Runtime/Core/Public/Math/RangeBound.h#L34
 type TRangeBound struct {
 	BoundType uint8       `json:"bound_type"`
 	Value     interface{} `json:"value"`
 }
 
+// https://github.com/SatisfactoryModdingUE/UnrealEngine/blob/4.22-CSS/Engine/Source/Runtime/Core/Public/Math/Range.h#L48
 type TRange struct {
 	LowerBound *TRangeBound `json:"lower_bound"`
 	UpperBound *TRangeBound `json:"upper_bound"`

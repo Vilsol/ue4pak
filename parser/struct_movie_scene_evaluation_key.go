@@ -1,5 +1,6 @@
 package parser
 
+// https://github.com/SatisfactoryModdingUE/UnrealEngine/blob/4.22-CSS/Engine/Source/Runtime/MovieScene/Public/Evaluation/MovieSceneEvaluationKey.h#L12
 type FMovieSceneEvaluationKey struct {
 	SequenceID      *FMovieSceneSequenceID      `json:"sequence_id"`
 	TrackIdentifier *FMovieSceneTrackIdentifier `json:"track_identifier"`
