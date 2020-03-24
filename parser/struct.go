@@ -99,6 +99,7 @@ var structResolvers = map[string]StructResolver{
 	"MovieSceneEvalTemplatePtr":          nil,
 	"MovieSceneTrackImplementationPtr":   nil,
 	"MovieSceneEvaluationTrack":          nil,
+	"MovieSceneFloatChannel":             nil,
 	"LevelSequenceBindingReferenceArray": nil,
 }
 
