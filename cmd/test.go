@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/Vilsol/ue4pak/parser"
-	"github.com/fatih/color"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Vilsol/ue4pak/parser"
+	"github.com/fatih/color"
 
 	"github.com/spf13/cobra"
 )

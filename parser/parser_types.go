@@ -3,11 +3,12 @@ package parser
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
+	"strings"
+
 	"github.com/Vilsol/ue4pak/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"math"
-	"strings"
 )
 
 type PakParser struct {

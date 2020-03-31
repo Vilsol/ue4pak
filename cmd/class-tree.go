@@ -3,13 +3,14 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
 	"github.com/Vilsol/ue4pak/parser"
 	"github.com/fatih/color"
 	"github.com/gobwas/glob"
 	"github.com/spf13/cobra"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 )
 
 func init() {

@@ -3,11 +3,12 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Vilsol/ue4pak/parser"
-	"github.com/fatih/color"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/Vilsol/ue4pak/parser"
+	"github.com/fatih/color"
 
 	"github.com/gobwas/glob"
 	"github.com/spf13/cobra"
