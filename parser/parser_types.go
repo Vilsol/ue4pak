@@ -53,7 +53,7 @@ func (parser *PakParser) ProcessPak(parseFile func(string) bool, handleEntry fun
 
 		if strings.HasSuffix(trimmed, "uasset") {
 			offset := record.FileOffset + pak.Footer.HeaderSize()
-			log.Infof("Reading Record: %d [%x-%x]: %s\n", j, offset, offset+record.FileSize, trimmed)
+			log.Infof("Reading Summary: %d [%x-%x]: %s\n", j, offset, offset+record.FileSize, trimmed)
 			summaries[trimmed[0:strings.Index(trimmed, ".uasset")]] = record.ReadUAsset(pak, parser)
 			summaries[trimmed[0:strings.Index(trimmed, ".uasset")]].Record = record
 		}

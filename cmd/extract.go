@@ -9,6 +9,7 @@ import (
 
 	"github.com/Vilsol/ue4pak/parser"
 	"github.com/fatih/color"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/gobwas/glob"
 	"github.com/spf13/cobra"
@@ -75,8 +76,12 @@ var extractCmd = &cobra.Command{
 						panic(err)
 					}
 
+					log.Infof("Writing Result: %s\n", destination)
 					resultBytes := formatResults(entry)
-					ioutil.WriteFile(destination, resultBytes, 0644)
+					err = ioutil.WriteFile(destination, resultBytes, 0644)
+					if err != nil {
+						panic(err)
+					}
 				} else {
 					results = append(results, entry)
 				}
