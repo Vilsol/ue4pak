@@ -55,8 +55,7 @@ var extractCmd = &cobra.Command{
 				panic(err)
 			}
 
-			p := parser.NewParser(file)
-			entrySets, _ := p.ProcessPak(func(name string) bool {
+			shouldProcess := func(name string) bool {
 				for _, pattern := range patterns {
 					if pattern.Match(name) {
 						return true
@@ -64,9 +63,12 @@ var extractCmd = &cobra.Command{
 				}
 
 				return false
-			})
+			}
 
-			results = append(results, entrySets...)
+			p := parser.NewParser(file)
+			p.ProcessPak(shouldProcess, func(entry *parser.PakEntrySet, _ *parser.PakFile) {
+				results = append(results, entry)
+			})
 		}
 
 		var resultBytes []byte
