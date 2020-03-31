@@ -71,26 +71,32 @@ var extractCmd = &cobra.Command{
 			})
 		}
 
-		var resultBytes []byte
-
-		if *format == "json" {
-			if *pretty {
-				resultBytes, err = json.MarshalIndent(results, "", "  ")
-			} else {
-				resultBytes, err = json.Marshal(results)
-			}
-
-			if err != nil {
-				panic(err)
-			}
-		} else {
-			panic("Unknown output format: " + *format)
-		}
-
+		resultBytes := formatResults(results)
 		err = ioutil.WriteFile(*output, resultBytes, 0644)
 
 		if err != nil {
 			panic(err)
 		}
 	},
+}
+
+func formatResults(result interface{}) []byte {
+	var resultBytes []byte
+	var err error
+
+	if *format == "json" {
+		if *pretty {
+			resultBytes, err = json.MarshalIndent(result, "", "  ")
+		} else {
+			resultBytes, err = json.Marshal(result)
+		}
+
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		panic("Unknown output format: " + *format)
+	}
+
+	return resultBytes
 }
