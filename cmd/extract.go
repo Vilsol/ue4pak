@@ -19,7 +19,8 @@ var assets *[]string
 func init() {
 	assets = extractCmd.Flags().StringSliceP("assets", "a", []string{}, "Comma-separated list of asset paths to extract. (supports glob) (required)")
 	format = extractCmd.Flags().StringP("format", "f", "json", "Output format type")
-	output = extractCmd.Flags().StringP("output", "o", "extracted.json", "Output file")
+	output = extractCmd.Flags().StringP("output", "o", "extracted.json", "Output file (or directory if --split)")
+	split = extractCmd.Flags().Bool("split", false, "Whether output should be split into a file per asset")
 	pretty = extractCmd.Flags().Bool("pretty", false, "Whether to output in a pretty format")
 
 	extractCmd.MarkFlagRequired("assets")
@@ -66,13 +67,26 @@ var extractCmd = &cobra.Command{
 			}
 
 			p := parser.NewParser(file)
-			p.ProcessPak(shouldProcess, func(entry *parser.PakEntrySet, _ *parser.PakFile) {
-				results = append(results, entry)
+			p.ProcessPak(shouldProcess, func(name string, entry *parser.PakEntrySet, _ *parser.PakFile) {
+				if *split {
+					destination := filepath.Join(*output, name+"."+*format)
+					err := os.MkdirAll(filepath.Dir(destination), 0755)
+					if err != nil {
+						panic(err)
+					}
+
+					resultBytes := formatResults(entry)
+					ioutil.WriteFile(destination, resultBytes, 0644)
+				} else {
+					results = append(results, entry)
+				}
 			})
 		}
 
-		resultBytes := formatResults(results)
-		err = ioutil.WriteFile(*output, resultBytes, 0644)
+		if !*split {
+			resultBytes := formatResults(results)
+			err = ioutil.WriteFile(*output, resultBytes, 0644)
+		}
 
 		if err != nil {
 			panic(err)

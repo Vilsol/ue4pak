@@ -36,7 +36,7 @@ func NewParser(reader PakReader) *PakParser {
 	}
 }
 
-func (parser *PakParser) ProcessPak(parseFile func(string) bool, handleEntry func(*PakEntrySet, *PakFile)) {
+func (parser *PakParser) ProcessPak(parseFile func(string) bool, handleEntry func(string, *PakEntrySet, *PakFile)) {
 	pak := parser.Parse()
 
 	summaries := make(map[string]*FPackageFileSummary, 0)
@@ -95,7 +95,7 @@ func (parser *PakParser) ProcessPak(parseFile func(string) bool, handleEntry fun
 			}
 
 			if handleEntry != nil {
-				handleEntry(&PakEntrySet{
+				handleEntry(trimmed, &PakEntrySet{
 					ExportRecord: record,
 					Summary:      summary,
 					Exports:      exportSet,

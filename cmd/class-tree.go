@@ -56,7 +56,7 @@ var classTreeCmd = &cobra.Command{
 			}
 
 			p := parser.NewParser(file)
-			p.ProcessPak(nil, func(entry *parser.PakEntrySet, _ *parser.PakFile) {
+			p.ProcessPak(nil, func(_ string, entry *parser.PakEntrySet, _ *parser.PakFile) {
 				for _, export := range entry.Exports {
 					open.WriteString(fmt.Sprintf("Class: %s%s\n", trim(export.Export.ObjectName), BuildClassTree(export.Export.ClassIndex)))
 					open.WriteString(fmt.Sprintf("Super: %s%s\n", trim(export.Export.ObjectName), BuildSuperTree(export.Export.SuperIndex)))
