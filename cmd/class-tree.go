@@ -3,13 +3,14 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
 	"github.com/Vilsol/ue4pak/parser"
 	"github.com/fatih/color"
 	"github.com/gobwas/glob"
 	"github.com/spf13/cobra"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 )
 
 func init() {
@@ -55,16 +56,14 @@ var classTreeCmd = &cobra.Command{
 			}
 
 			p := parser.NewParser(file)
-			things, _ := p.ProcessPak(nil)
-
-			for _, thing := range things {
-				for _, export := range thing.Exports {
+			p.ProcessPak(nil, func(_ string, entry *parser.PakEntrySet, _ *parser.PakFile) {
+				for _, export := range entry.Exports {
 					open.WriteString(fmt.Sprintf("Class: %s%s\n", trim(export.Export.ObjectName), BuildClassTree(export.Export.ClassIndex)))
 					open.WriteString(fmt.Sprintf("Super: %s%s\n", trim(export.Export.ObjectName), BuildSuperTree(export.Export.SuperIndex)))
 					open.WriteString(fmt.Sprintf("Templ: %s%s\n", trim(export.Export.ObjectName), BuildTemplateTree(export.Export.TemplateIndex)))
 					open.WriteString(fmt.Sprintf("Outer: %s%s\n", trim(export.Export.ObjectName), BuildOuterTree(export.Export.OuterIndex)))
 				}
-			}
+			})
 
 			// indent, _ := json.MarshalIndent(concreteRecipe.Exports, "", " ")
 			// fmt.Println(string(indent))

@@ -3,11 +3,13 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Vilsol/ue4pak/parser"
-	"github.com/fatih/color"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/Vilsol/ue4pak/parser"
+	"github.com/fatih/color"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/gobwas/glob"
 	"github.com/spf13/cobra"
@@ -18,7 +20,8 @@ var assets *[]string
 func init() {
 	assets = extractCmd.Flags().StringSliceP("assets", "a", []string{}, "Comma-separated list of asset paths to extract. (supports glob) (required)")
 	format = extractCmd.Flags().StringP("format", "f", "json", "Output format type")
-	output = extractCmd.Flags().StringP("output", "o", "extracted.json", "Output file")
+	output = extractCmd.Flags().StringP("output", "o", "extracted.json", "Output file (or directory if --split)")
+	split = extractCmd.Flags().Bool("split", false, "Whether output should be split into a file per asset")
 	pretty = extractCmd.Flags().Bool("pretty", false, "Whether to output in a pretty format")
 
 	extractCmd.MarkFlagRequired("assets")
@@ -54,8 +57,7 @@ var extractCmd = &cobra.Command{
 				panic(err)
 			}
 
-			p := parser.NewParser(file)
-			entrySets, _ := p.ProcessPak(func(name string) bool {
+			shouldProcess := func(name string) bool {
 				for _, pattern := range patterns {
 					if pattern.Match(name) {
 						return true
@@ -63,31 +65,57 @@ var extractCmd = &cobra.Command{
 				}
 
 				return false
+			}
+
+			p := parser.NewParser(file)
+			p.ProcessPak(shouldProcess, func(name string, entry *parser.PakEntrySet, _ *parser.PakFile) {
+				if *split {
+					destination := filepath.Join(*output, name+"."+*format)
+					err := os.MkdirAll(filepath.Dir(destination), 0755)
+					if err != nil {
+						panic(err)
+					}
+
+					log.Infof("Writing Result: %s\n", destination)
+					resultBytes := formatResults(entry)
+					err = ioutil.WriteFile(destination, resultBytes, 0644)
+					if err != nil {
+						panic(err)
+					}
+				} else {
+					results = append(results, entry)
+				}
 			})
-
-			results = append(results, entrySets...)
 		}
 
-		var resultBytes []byte
-
-		if *format == "json" {
-			if *pretty {
-				resultBytes, err = json.MarshalIndent(results, "", "  ")
-			} else {
-				resultBytes, err = json.Marshal(results)
-			}
-
-			if err != nil {
-				panic(err)
-			}
-		} else {
-			panic("Unknown output format: " + *format)
+		if !*split {
+			resultBytes := formatResults(results)
+			err = ioutil.WriteFile(*output, resultBytes, 0644)
 		}
-
-		err = ioutil.WriteFile(*output, resultBytes, 0644)
 
 		if err != nil {
 			panic(err)
 		}
 	},
+}
+
+func formatResults(result interface{}) []byte {
+	var resultBytes []byte
+	var err error
+
+	if *format == "json" {
+		if *pretty {
+			resultBytes, err = json.MarshalIndent(result, "", "  ")
+		} else {
+			resultBytes, err = json.Marshal(result)
+		}
+
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		panic("Unknown output format: " + *format)
+	}
+
+	return resultBytes
 }
