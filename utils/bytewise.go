@@ -40,9 +40,12 @@ func safeChar(char byte) string {
 }
 
 func HexDump(data []byte) string {
+	return HexDumpWidth(data, 32)
+}
+
+func HexDumpWidth(data []byte, perRow int) string {
 	result := ""
 
-	perRow := 32
 	rows := int(math.Ceil(float64(len(data)) / float64(perRow)))
 
 	rowWidth := perRow * 5

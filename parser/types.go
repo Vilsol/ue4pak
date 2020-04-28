@@ -42,8 +42,8 @@ type PakEntrySet struct {
 }
 
 type PakExportSet struct {
-	Export     *FObjectExport  `json:"export"`
-	Properties []*FPropertyTag `json:"properties"`
+	Export *FObjectExport `json:"export"`
+	Data   *ExportData    `json:"data"`
 }
 
 type FPakInfo struct {
@@ -248,10 +248,47 @@ type MapPropertyEntry struct {
 	Value interface{} `json:"value"`
 }
 
+type ExportData struct {
+	Properties []*FPropertyTag `json:"properties"`
+	Data       interface{}     `json:"data"`
+}
+
 func (pakInfo *FPakInfo) HeaderSize() uint64 {
 	if pakInfo.Version < 8 {
 		return 53
 	}
 
 	return 50
+}
+
+func (index *FPackageIndex) ObjectName() *string {
+	classReference := index.Reference
+
+	if classReference == nil {
+		return nil
+	}
+
+	if ref, ok := classReference.(*FObjectImport); ok {
+		return &ref.ObjectName
+	} else if ref, ok := classReference.(*FObjectExport); ok {
+		return &ref.ObjectName
+	}
+
+	return nil
+}
+
+func (index *FPackageIndex) ClassName() *string {
+	classReference := index.Reference
+
+	if classReference == nil {
+		return nil
+	}
+
+	if ref, ok := classReference.(*FObjectImport); ok {
+		return &ref.ClassName
+	} else if ref, ok := classReference.(*FObjectExport); ok {
+		return ref.ClassIndex.ObjectName()
+	}
+
+	return nil
 }
