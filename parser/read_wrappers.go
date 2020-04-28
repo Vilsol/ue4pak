@@ -26,5 +26,6 @@ func (reader *PakByteReader) Seek(offset int64, whence int) (ret int64, err erro
 
 func (reader *PakByteReader) Read(b []byte) (n int, err error) {
 	copied := copy(b, reader.Bytes[reader.Offset:])
+	reader.Offset += int64(copied)
 	return copied, nil
 }
