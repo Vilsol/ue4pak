@@ -1,4 +1,6 @@
 # ue4pak
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FVilsol%2Fue4pak.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FVilsol%2Fue4pak?ref=badge_shield)
+
 
 ```
 ue4pak parses and extracts data from UE4 Pak files
@@ -21,3 +23,6 @@ Flags:
 
 Use "ue4pak [command] --help" for more information about a command.
 ```
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FVilsol%2Fue4pak.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2FVilsol%2Fue4pak?ref=badge_large)
