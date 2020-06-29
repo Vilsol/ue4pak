@@ -80,6 +80,9 @@ var structResolvers = map[string]StructResolver{
 
 		return parser.ReadFExpressionInput(uAsset.Names)
 	},
+	"IntVector": func(parser *PakParser, property *StructProperty, size int32, uAsset *FPackageFileSummary) interface{} {
+		return parser.ReadFIntVector()
+	},
 	"ScalarMaterialInput":                nil,
 	"ColorMaterialInput":                 nil,
 	"PerPlatformFloat":                   nil,
@@ -125,9 +128,7 @@ func (parser *PakParser) ReadStruct(property *StructProperty, size int32, uAsset
 		}
 	}
 
-	// TODO Read types correctly
 	log.Warningf("%sUnread StructProperty Type [%d]: %s", d(depth), size, trimmedType)
-	// fmt.Println(utils.HexDump(data[offset:]))
 	if size > 0 {
 		parser.Read(size)
 	}
