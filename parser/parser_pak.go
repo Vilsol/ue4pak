@@ -89,6 +89,11 @@ func (parser *PakParser) Parse() *PakFile {
 		if pakFooter.Version == 4 {
 			// TODO ???
 		}
+
+		if pakFooter.Version >= 9 {
+			// TODO Unknown bytes
+			parser.Read(3)
+		}
 	}
 
 	return &PakFile{

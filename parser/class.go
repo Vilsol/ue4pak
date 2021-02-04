@@ -31,6 +31,48 @@ var classResolvers = map[string]ClassResolver{
 		parser.Read(24)
 		return parser.ReadFPackageIndex(uAsset.Imports, uAsset.Exports)
 	},
+	/*
+		"Texture2D": func(parser *PakParser, export *FObjectExport, size int32, uAsset *FPackageFileSummary) interface{} {
+			// TODO Figure out
+			parser.Read(4)
+
+			// Some unknown flags
+			parser.Read(2)
+			parser.Read(2)
+
+			cooked := parser.ReadUint32()
+			textures := make([]*FTexturePlatformData, 0)
+
+			if cooked != 1 {
+				// Uncooked asset. No idea how it can exist.
+				return textures
+			}
+
+			pixelFormat := parser.ReadFName(uAsset.Names)
+
+			for strings.Trim(pixelFormat, "\x00") != "None" {
+				// TODO Unknown
+				parser.ReadInt64()
+				textures = append(textures, parser.ReadFTexturePlatformData(0))
+				pixelFormat = parser.ReadFName(uAsset.Names)
+			}
+
+			texture := Texture2D{
+				Cooked:   cooked,
+				Textures: textures,
+			}
+
+			img := texture.ToImage()
+
+			if img != nil {
+				f, _ := os.Create("paks/" + strings.Trim(export.ObjectName, "\x00") + ".png")
+				defer f.Close()
+				_ = png.Encode(f, img)
+			}
+
+			return texture
+		},
+	*/
 }
 
 type ClassType struct {

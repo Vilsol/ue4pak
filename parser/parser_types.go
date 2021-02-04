@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"fmt"
+	"runtime/debug"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -51,7 +53,20 @@ func (parser *PakParser) ProcessPak(parseFile func(string) bool, handleEntry fun
 
 			log.Infof("Reading Record: %d [%x-%x]: %s\n", j, offset, offset+record.FileSize, trimmed)
 
-			exports := record.ReadUExp(pak, parser, summary)
+			output := make(chan map[*FObjectExport]*ExportData)
+
+			go func() {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Errorf("error parsing record: %v", err)
+						fmt.Println(string(debug.Stack()))
+						output <- make(map[*FObjectExport]*ExportData)
+					}
+				}()
+				output <- record.ReadUExp(pak, parser, summary)
+			}()
+
+			exports := <-output
 
 			exportSet := make([]PakExportSet, len(exports))
 

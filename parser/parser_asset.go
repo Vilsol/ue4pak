@@ -22,6 +22,11 @@ func (record *FPakEntry) ReadUAsset(pak *PakFile, parser *PakParser) *FPackageFi
 	// TODO custom_version_container: Vec<FCustomVersion>
 	parser.Read(4)
 
+	if pak.Footer.Version >= 9 {
+		// TODO Unknown bytes
+		parser.Read(3)
+	}
+
 	totalHeaderSize := parser.ReadInt32()
 	folderName := parser.ReadString()
 	packageFlags := parser.ReadUint32()
@@ -180,15 +185,26 @@ func (record *FPakEntry) ReadUExp(pak *PakFile, parser *PakParser, uAsset *FPack
 
 	exports := make(map[*FObjectExport]*ExportData)
 
+	// spew.Dump(uAsset.Names)
+
 	for _, export := range uAsset.Exports {
 		offset := headerSize + int64(record.FileOffset) + (export.SerialOffset - int64(uAsset.TotalHeaderSize))
 		log.Debugf("Reading export [%x]: %#v", offset, export.TemplateIndex.Reference)
 		parser.Seek(offset, 0)
 
+		// fmt.Println(utils.HexDump(parser.Read(int32(export.SerialSize))))
+		// parser.Seek(offset, 0)
+
 		tracker := parser.TrackRead()
+
+		if pak.Footer.Version >= 9 {
+			// TODO Unknown bytes
+			parser.Read(3)
+		}
 
 		properties := parser.ReadFPropertyTagLoop(uAsset)
 
+		parser.preload = nil
 		if int64(tracker.bytesRead) < export.SerialSize {
 			parser.Preload(int32(export.SerialSize - int64(tracker.bytesRead)))
 		}
@@ -205,6 +221,7 @@ func (record *FPakEntry) ReadUExp(pak *PakFile, parser *PakParser, uAsset *FPack
 
 				if !parsed {
 					if className := export.TemplateIndex.ClassName(); className != nil {
+						// fmt.Println(utils.HexDump(parser.preload))
 						log.Warningf("Unknown export class type (%s)[%d]: %s", strings.Trim(export.ObjectName, "\x00"), preloadSize, strings.Trim(*className, "\x00"))
 					}
 				}
@@ -368,6 +385,9 @@ func (parser *PakParser) ReadTag(size int32, uAsset *FPackageFileSummary, proper
 			case "UInt32Property":
 				values[i] = parser.ReadUint32()
 				break
+			case "UInt64Property":
+				values[i] = parser.ReadUint64()
+				break
 			case "TextProperty":
 				values[i] = parser.ReadFText()
 				break
@@ -397,7 +417,7 @@ func (parser *PakParser) ReadTag(size int32, uAsset *FPackageFileSummary, proper
 		break
 	case "StructProperty":
 		if tagData == nil {
-			log.Trace("%sReading Generic StructProperty", d(depth))
+			log.Tracef("%sReading Generic StructProperty", d(depth))
 		} else {
 			log.Tracef("%sReading StructProperty: %s", d(depth), strings.Trim(tagData.(*StructProperty).Type, "\x00"))
 
@@ -534,7 +554,7 @@ func (parser *PakParser) ReadTag(size int32, uAsset *FPackageFileSummary, proper
 
 		results := make([]*MapPropertyEntry, num)
 		for i := int32(0); i < num; i++ {
-			key := parser.ReadTag(-4, uAsset, keyType, keyData, nil, depth+1)
+			key := parser.ReadTag(8, uAsset, keyType, keyData, nil, depth+1)
 
 			if key == nil {
 				parser.Read(size - 8)

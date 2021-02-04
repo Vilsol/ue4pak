@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/spf13/viper"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -23,6 +24,12 @@ func init() {
 	output = extractCmd.Flags().StringP("output", "o", "extracted.json", "Output file (or directory if --split)")
 	split = extractCmd.Flags().Bool("split", false, "Whether output should be split into a file per asset")
 	pretty = extractCmd.Flags().Bool("pretty", false, "Whether to output in a pretty format")
+
+	extractCmd.Flags().Bool("with-index", false, "Whether to output FPackageIndex")
+	extractCmd.Flags().Bool("with-names", false, "Whether to output names")
+
+	_ = viper.BindPFlag("with-index", extractCmd.Flags().Lookup("with-index"))
+	_ = viper.BindPFlag("with-names", extractCmd.Flags().Lookup("with-names"))
 
 	extractCmd.MarkFlagRequired("assets")
 
@@ -45,6 +52,7 @@ var extractCmd = &cobra.Command{
 		for i, asset := range *assets {
 			patterns[i] = glob.MustCompile(asset)
 		}
+		fmt.Println(patterns, *assets)
 
 		results := make([]*parser.PakEntrySet, 0)
 
@@ -87,6 +95,14 @@ var extractCmd = &cobra.Command{
 				}
 			})
 		}
+
+		/*
+			if c, ok := x.Reference.(*FObjectExport); ok {
+				if strings.Trim(c.ObjectName, "\x00") == "BPD_ResearchTreeNode_C" {
+					uAsset.ParseObject(parser, c, pak, record)
+				}
+			}
+		*/
 
 		if !*split {
 			resultBytes := formatResults(results)

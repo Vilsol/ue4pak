@@ -80,20 +80,20 @@ func (parser *PakParser) ReadFText() *FText {
 	flags := parser.ReadUint32()
 	historyType := int8(parser.Read(1)[0])
 
-	if historyType != 0 {
-		return &FText{
-			Flags:       flags,
-			HistoryType: historyType,
-		}
+	text := FText{
+		Flags:       flags,
+		HistoryType: historyType,
 	}
 
-	return &FText{
-		Flags:        flags,
-		HistoryType:  historyType,
-		Namespace:    parser.ReadString(),
-		Key:          parser.ReadString(),
-		SourceString: parser.ReadString(),
+	if historyType != 0 {
+		return &text
 	}
+
+	text.Namespace = parser.ReadString()
+	text.Key = parser.ReadString()
+	text.SourceString = parser.ReadString()
+
+	return &text
 }
 
 func (parser *PakParser) ReadFPropertyTagLoop(uAsset *FPackageFileSummary) []*FPropertyTag {
