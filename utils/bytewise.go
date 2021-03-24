@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/fatih/color"
 	"math"
-	"strconv"
+	"strings"
 	"unicode/utf16"
 )
 
@@ -48,11 +48,6 @@ func HexDumpWidth(data []byte, perRow int) string {
 
 	rows := int(math.Ceil(float64(len(data)) / float64(perRow)))
 
-	rowWidth := perRow * 5
-	if len(data) < perRow {
-		rowWidth = len(data) * 5
-	}
-
 	lengthChars := 0
 	stringChars := uint32(0)
 
@@ -70,23 +65,28 @@ func HexDumpWidth(data []byte, perRow int) string {
 			}
 
 			hexTemp := fmt.Sprintf("%#-4x", data[offset]) + " "
-			charTemp := fmt.Sprintf("%s", safeChar(data[offset]))
+			charTemp := safeChar(data[offset])
 
-			if lengthChars > 0 {
+			switch {
+			case lengthChars > 0:
 				hexSide += color.BlueString(hexTemp)
 				charSide += color.BlueString(charTemp)
 				lengthChars--
-			} else if stringChars > 0 {
+			case stringChars > 0:
 				hexSide += color.GreenString(hexTemp)
 				charSide += color.GreenString(charTemp)
 				stringChars--
-			} else {
+			default:
 				hexSide += hexTemp
 				charSide += charTemp
 			}
 		}
 
-		result += fmt.Sprintf("%-#6x: %-"+strconv.Itoa(rowWidth)+"s%s\n", i*perRow, hexSide, charSide)
+		result += fmt.Sprintf("%-#6x: %s", i*perRow, hexSide)
+		if len(data[i*perRow:]) < perRow && len(data) > perRow {
+			result += strings.Repeat(" ", (perRow-len(data[i*perRow:]))*5)
+		}
+		result += fmt.Sprintf("%s\n", charSide)
 	}
 
 	return result

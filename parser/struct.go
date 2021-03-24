@@ -105,6 +105,7 @@ var structResolvers = map[string]StructResolver{
 	"MovieSceneFloatChannel":             nil,
 	"LevelSequenceBindingReferenceArray": nil,
 	"MovieSceneTrackFieldData":           nil,
+	"NiagaraDataInterfaceGPUParamInfo":   nil,
 }
 
 type StructType struct {

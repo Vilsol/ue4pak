@@ -85,6 +85,23 @@ func (parser *PakParser) ReadFText() *FText {
 		HistoryType: historyType,
 	}
 
+	if flags == 2 && historyType == -1 {
+		// TODO Unknown
+		if parser.ReadInt32() == 0 {
+			return &text
+		}
+
+		text.SourceString = parser.ReadString()
+		return &text
+	}
+
+	if flags == 0 && historyType == 11 {
+		// TODO Unknown
+		parser.Read(8)
+		text.SourceString = parser.ReadString()
+		return &text
+	}
+
 	if historyType != 0 {
 		return &text
 	}
