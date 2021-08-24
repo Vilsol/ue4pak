@@ -2,7 +2,6 @@ package parser
 
 import (
 	"encoding/binary"
-	log "github.com/sirupsen/logrus"
 )
 
 func (parser *PakParser) Parse() *PakFile {
@@ -21,7 +20,7 @@ func (parser *PakParser) Parse() *PakFile {
 		magicOffset -= 1
 
 		if magicOffset < -1024 {
-			log.Fatal("Could not find magic bytes in pak!")
+			panic("Could not find magic bytes in pak!")
 		}
 	}
 

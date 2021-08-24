@@ -306,7 +306,7 @@ func (parser *PakParser) ReadFPropertyTag(uAsset *FPackageFileSummary, readData 
 				size)
 
 			if tracker.bytesRead > size {
-				log.Fatalf("More bytes read than available!")
+				panic("More bytes read than available!")
 			} else {
 				parser.Read(size - tracker.bytesRead)
 			}

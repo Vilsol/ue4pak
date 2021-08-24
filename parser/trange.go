@@ -1,6 +1,8 @@
 package parser
 
-import "log"
+import (
+	"fmt"
+)
 
 // https://github.com/SatisfactoryModdingUE/UnrealEngine/blob/4.22-CSS/Engine/Source/Runtime/Core/Public/Math/RangeBound.h#L34
 type TRangeBound struct {
@@ -30,8 +32,7 @@ func (parser *PakParser) ReadTRangeBound(t string) *TRangeBound {
 		value = parser.ReadInt32()
 		break
 	default:
-		log.Fatalf("Unkown bound type: %s", t)
-		break
+		panic(fmt.Sprintf("Unkown bound type: %s", t))
 	}
 
 	return &TRangeBound{
