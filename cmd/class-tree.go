@@ -50,13 +50,13 @@ var classTreeCmd = &cobra.Command{
 			fmt.Println("Parsing file:", f)
 
 			file, err := os.OpenFile(f, os.O_RDONLY, 0644)
-
+			defer open.Close()
 			if err != nil {
 				panic(err)
 			}
 
 			p := parser.NewParser(file)
-			p.ProcessPak(nil, func(_ string, entry *parser.PakEntrySet, _ *parser.PakFile) {
+			err = p.ProcessPak(nil, func(_ string, entry *parser.PakEntrySet, _ *parser.PakFile) {
 				for _, export := range entry.Exports {
 					open.WriteString(fmt.Sprintf("Class: %s%s\n", trim(export.Export.ObjectName), BuildClassTree(export.Export.ClassIndex)))
 					open.WriteString(fmt.Sprintf("Super: %s%s\n", trim(export.Export.ObjectName), BuildSuperTree(export.Export.SuperIndex)))
@@ -65,12 +65,14 @@ var classTreeCmd = &cobra.Command{
 				}
 			})
 
+			if err != nil {
+				panic(err)
+			}
+
 			// indent, _ := json.MarshalIndent(concreteRecipe.Exports, "", " ")
 			// fmt.Println(string(indent))
 			// fmt.Printf("%#v\n", concreteRecipe.ExportRecord.FileName)
 		}
-
-		open.Close()
 
 		var resultBytes []byte
 

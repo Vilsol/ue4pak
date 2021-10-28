@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/Vilsol/ue4pak/parser"
-	"github.com/fatih/color"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Vilsol/ue4pak/parser"
+	"github.com/fatih/color"
 )
 
 func TestParseAllAsFiles(t *testing.T) {
@@ -26,11 +27,14 @@ func TestParseAllAsFiles(t *testing.T) {
 		file, err := os.OpenFile(f, os.O_RDONLY, 0644)
 
 		if err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 
 		p := parser.NewParser(file)
-		pak := p.Parse()
+		pak, err := p.Parse()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		summaries := make(map[string]*parser.FPackageFileSummary, 0)
 
@@ -77,7 +81,7 @@ func TestParseAllAsBytes(t *testing.T) {
 		data, err := ioutil.ReadFile(f)
 
 		if err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 
 		reader := &parser.PakByteReader{
@@ -85,7 +89,10 @@ func TestParseAllAsBytes(t *testing.T) {
 		}
 
 		p := parser.NewParser(reader)
-		pak := p.Parse()
+		pak, err := p.Parse()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		summaries := make(map[string]*parser.FPackageFileSummary, 0)
 

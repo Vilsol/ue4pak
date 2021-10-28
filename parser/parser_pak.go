@@ -4,12 +4,15 @@ import (
 	"encoding/binary"
 )
 
-func (parser *PakParser) Parse() *PakFile {
+func (parser *PakParser) Parse() (*PakFile, error) {
 	// Find magic number
 	magicOffset := int64(-44)
 
 	for {
-		parser.Seek(magicOffset, 2)
+		_, err := parser.Seek(magicOffset, 2)
+		if err != nil {
+			return nil, err
+		}
 
 		magicArray := parser.Read(4)
 
@@ -25,7 +28,11 @@ func (parser *PakParser) Parse() *PakFile {
 	}
 
 	// Seek and read the footer of the file
-	parser.Seek(magicOffset, 2)
+	_, err := parser.Seek(magicOffset, 2)
+	if err != nil {
+		return nil, err
+	}
+
 	footer := parser.Read(int32(magicOffset * -1))
 
 	pakFooter := &FPakInfo{
@@ -37,7 +44,10 @@ func (parser *PakParser) Parse() *PakFile {
 	}
 
 	// Seek and read the index of the file
-	parser.Seek(int64(pakFooter.IndexOffset), 0)
+	_, err = parser.Seek(int64(pakFooter.IndexOffset), 0)
+	if err != nil {
+		return nil, err
+	}
 
 	mountPoint := parser.ReadString()
 	recordCount := parser.ReadUint32()
@@ -98,5 +108,5 @@ func (parser *PakParser) Parse() *PakFile {
 	return &PakFile{
 		Footer: pakFooter,
 		Index:  pakIndex,
-	}
+	}, nil
 }
