@@ -8,8 +8,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (parser *PakParser) ProcessPak(parseFile func(string) bool, handleEntry func(string, *PakEntrySet, *PakFile)) {
-	pak := parser.Parse()
+func (parser *PakParser) ProcessPak(parseFile func(string) bool, handleEntry func(string, *PakEntrySet, *PakFile)) error {
+	pak, err := parser.Parse()
+	if err != nil {
+		return fmt.Errorf("parsing pack failed: %w", err)
+	}
 
 	summaries := make(map[string]*FPackageFileSummary, 0)
 
@@ -88,4 +91,5 @@ func (parser *PakParser) ProcessPak(parseFile func(string) bool, handleEntry fun
 			}
 		}
 	}
+	return nil
 }
