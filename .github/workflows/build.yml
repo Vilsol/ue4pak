@@ -36,7 +36,7 @@ jobs:
         uses: CyberAndrii/setup-steamcmd@v1
 
       - name: Install Satisfactory Dedicated Server
-        run: steamcmd +login anonymous +force_install_dir ./SatisfactoryDedicatedServer +app_update 1690800 validate +quit && ls -lR
+        run: steamcmd +login anonymous +force_install_dir $GITHUB_WORKSPACE/SatisfactoryDedicatedServer +app_update 1690800 validate +quit && ls -lR
 
       - name: Test
         run: go run main.go test --pak ./SatisfactoryDedicatedServer/data/FactoryGame/Content/Paks/FactoryGame-LinuxServer.pak --colors --log info --assets "*"
