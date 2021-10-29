@@ -10,13 +10,33 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v1
         with:
-          go-version: 1.15
+          go-version: 1.17
 
       - name: Check out code
         uses: actions/checkout@v2
 
-      - name: Get dependencies
-        run: go get -v -t -d ./...
-
       - name: Build
         run: go build -v -o ue4pak .
+
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.17
+
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Setup steamcmd
+        uses: CyberAndrii/setup-steamcmd@v1
+
+      - name: Install Satisfactory Dedicated Server
+        run: steamcmd +login anonymous +force_install_dir ./SatisfactoryDedicatedServer +app_update 1690800 validate +quit
+
+      - name: Test
+        run: go run main.go test --pak ./SatisfactoryDedicatedServer/data/FactoryGame/Content/Paks/FactoryGame-LinuxServer.pak --colors --log info --assets "*"

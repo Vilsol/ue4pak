@@ -24,7 +24,7 @@ func (parser *PakParser) ProcessPak(parseFile func(string) bool, handleEntry fun
 		}
 
 		if strings.HasSuffix(trimmed, "uasset") {
-			offset := record.FileOffset + pak.Footer.HeaderSize()
+			offset := record.FileOffset + int64(pak.Footer.HeaderSize())
 			log.Infof("Reading Summary: %d [%x-%x]: %s\n", j, offset, offset+record.FileSize, trimmed)
 			summaries[trimmed[0:strings.Index(trimmed, ".uasset")]] = record.ReadUAsset(pak, parser)
 			summaries[trimmed[0:strings.Index(trimmed, ".uasset")]].Record = record
@@ -44,7 +44,7 @@ func (parser *PakParser) ProcessPak(parseFile func(string) bool, handleEntry fun
 		if strings.HasSuffix(trimmed, "uexp") {
 			summary, ok := summaries[trimmed[0:strings.Index(trimmed, ".uexp")]]
 
-			offset := record.FileOffset + pak.Footer.HeaderSize()
+			offset := record.FileOffset + int64(pak.Footer.HeaderSize())
 
 			if !ok {
 				log.Errorf("Unable to read record. Missing uasset: %d [%x-%x]: %s\n", j, offset, offset+record.FileSize, trimmed)

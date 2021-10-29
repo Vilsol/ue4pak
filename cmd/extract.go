@@ -52,7 +52,6 @@ var extractCmd = &cobra.Command{
 		for i, asset := range *assets {
 			patterns[i] = glob.MustCompile(asset)
 		}
-		fmt.Println(patterns, *assets)
 
 		results := make([]*parser.PakEntrySet, 0)
 

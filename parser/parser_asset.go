@@ -188,7 +188,7 @@ func (record *FPakEntry) ReadUExp(pak *PakFile, parser *PakParser, uAsset *FPack
 	// spew.Dump(uAsset.Names)
 
 	for _, export := range uAsset.Exports {
-		offset := headerSize + int64(record.FileOffset) + (export.SerialOffset - int64(uAsset.TotalHeaderSize))
+		offset := headerSize + record.FileOffset + (export.SerialOffset - int64(uAsset.TotalHeaderSize))
 		log.Debugf("Reading export [%x]: %#v", offset, export.TemplateIndex.Reference)
 		parser.Seek(offset, 0)
 

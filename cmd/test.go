@@ -26,7 +26,6 @@ var testCmd = &cobra.Command{
 	Short: "Test parse the provided paks",
 	Run: func(cmd *cobra.Command, args []string) {
 		color.NoColor = false
-
 		paks, err := filepath.Glob(cmd.Flag("pak").Value.String())
 
 		patterns := make([]glob.Glob, len(*testAssets))
@@ -37,6 +36,8 @@ var testCmd = &cobra.Command{
 		if err != nil {
 			panic(err)
 		}
+
+		fmt.Println(paks)
 
 		for _, f := range paks {
 			fmt.Println("Parsing file:", f)

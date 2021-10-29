@@ -66,9 +66,9 @@ type FPakIndex struct {
 
 type FPakEntry struct {
 	FileName          string `json:"file_name"`
-	FileOffset        uint64 `json:"file_offset"`
-	FileSize          uint64 `json:"file_size"`
-	UncompressedSize  uint64 `json:"uncompressed_size"`
+	FileOffset        int64  `json:"file_offset"`
+	FileSize          int64  `json:"file_size"`
+	UncompressedSize  int64  `json:"uncompressed_size"`
 	CompressionMethod uint32 `json:"compression_method"`
 
 	// Only version <= 1
@@ -411,6 +411,10 @@ type MapPropertyEntry struct {
 type ExportData struct {
 	Properties []*FPropertyTag `json:"properties"`
 	Data       interface{}     `json:"data"`
+}
+
+type FPakEntryLocation struct {
+	Index int32 `json:"index"`
 }
 
 func (pakInfo *FPakInfo) HeaderSize() uint64 {
