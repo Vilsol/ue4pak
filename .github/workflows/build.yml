@@ -19,7 +19,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
-          args: build
+          args: build --snapshot
 
   e2e:
     name: E2E
