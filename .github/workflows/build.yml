@@ -15,8 +15,11 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
-      - name: Build
-        run: go build -v -o ue4pak .
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v2
+        with:
+          version: latest
+          args: build
 
   e2e:
     name: E2E
