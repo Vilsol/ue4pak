@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/spf13/viper"
 	"io/ioutil"
 	"os"
@@ -10,7 +9,7 @@ import (
 
 	"github.com/Vilsol/ue4pak/parser"
 	"github.com/fatih/color"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	"github.com/gobwas/glob"
 	"github.com/spf13/cobra"
@@ -56,7 +55,7 @@ var extractCmd = &cobra.Command{
 		results := make([]*parser.PakEntrySet, 0)
 
 		for _, f := range paks {
-			fmt.Println("Parsing file:", f)
+			log.Info().Msgf("Parsing file: %s", f)
 
 			file, err := os.OpenFile(f, os.O_RDONLY, 0644)
 
@@ -74,8 +73,10 @@ var extractCmd = &cobra.Command{
 				return false
 			}
 
+			ctx := log.Logger.WithContext(cmd.Context())
+
 			p := parser.NewParser(file)
-			p.ProcessPak(shouldProcess, func(name string, entry *parser.PakEntrySet, _ *parser.PakFile) {
+			p.ProcessPak(ctx, shouldProcess, func(name string, entry *parser.PakEntrySet, _ *parser.PakFile) {
 				if *split {
 					destination := filepath.Join(*output, name+"."+*format)
 					err := os.MkdirAll(filepath.Dir(destination), 0755)
@@ -83,7 +84,7 @@ var extractCmd = &cobra.Command{
 						panic(err)
 					}
 
-					log.Infof("Writing Result: %s\n", destination)
+					log.Info().Msgf("Writing Result: %s", destination)
 					resultBytes := formatResults(entry)
 					err = ioutil.WriteFile(destination, resultBytes, 0644)
 					if err != nil {

@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"fmt"
 	"github.com/gobwas/glob"
+	"github.com/rs/zerolog/log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,10 +37,8 @@ var testCmd = &cobra.Command{
 			panic(err)
 		}
 
-		fmt.Println(paks)
-
 		for _, f := range paks {
-			fmt.Println("Parsing file:", f)
+			log.Info().Msgf("Parsing file: %s", f)
 
 			file, err := os.OpenFile(f, os.O_RDONLY, 0644)
 
@@ -62,8 +60,10 @@ var testCmd = &cobra.Command{
 				return false
 			}
 
+			ctx := log.Logger.WithContext(cmd.Context())
+
 			p := parser.NewParser(file)
-			p.ProcessPak(shouldProcess, nil)
+			p.ProcessPak(ctx, shouldProcess, nil)
 			/*
 				f, err := os.OpenFile("dump.txt", os.O_WRONLY | os.O_CREATE, 0644)
 				fmt.Println(err)

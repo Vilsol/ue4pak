@@ -1,32 +1,33 @@
 package parser
 
 import (
-	log "github.com/sirupsen/logrus"
+	"context"
+	"github.com/rs/zerolog/log"
 	"strings"
 )
 
-type ClassResolver func(parser *PakParser, export *FObjectExport, size int32, uAsset *FPackageFileSummary) interface{}
+type ClassResolver func(ctx context.Context, parser *PakParser, export *FObjectExport, size int32, uAsset *FPackageFileSummary) interface{}
 
 var classResolvers = map[string]ClassResolver{
-	"DataTable": func(parser *PakParser, export *FObjectExport, size int32, uAsset *FPackageFileSummary) interface{} {
-		return parser.ReadUDataTable(uAsset)
+	"DataTable": func(ctx context.Context, parser *PakParser, export *FObjectExport, size int32, uAsset *FPackageFileSummary) interface{} {
+		return parser.ReadUDataTable(ctx, uAsset)
 	},
-	"ObjectProperty": func(parser *PakParser, export *FObjectExport, size int32, uAsset *FPackageFileSummary) interface{} {
+	"ObjectProperty": func(ctx context.Context, parser *PakParser, export *FObjectExport, size int32, uAsset *FPackageFileSummary) interface{} {
 		// TODO Figure out
 		parser.Read(24)
 		return parser.ReadFPackageIndex(uAsset.Imports, uAsset.Exports)
 	},
-	"BoolProperty": func(parser *PakParser, export *FObjectExport, size int32, uAsset *FPackageFileSummary) interface{} {
+	"BoolProperty": func(ctx context.Context, parser *PakParser, export *FObjectExport, size int32, uAsset *FPackageFileSummary) interface{} {
 		// TODO Figure out
 		parser.Read(25)
 		return parser.Read(1)[0] != 0
 	},
-	"StructProperty": func(parser *PakParser, export *FObjectExport, size int32, uAsset *FPackageFileSummary) interface{} {
+	"StructProperty": func(ctx context.Context, parser *PakParser, export *FObjectExport, size int32, uAsset *FPackageFileSummary) interface{} {
 		// TODO Figure out
 		parser.Read(24)
 		return parser.ReadFPackageIndex(uAsset.Imports, uAsset.Exports)
 	},
-	"DelegateProperty": func(parser *PakParser, export *FObjectExport, size int32, uAsset *FPackageFileSummary) interface{} {
+	"DelegateProperty": func(ctx context.Context, parser *PakParser, export *FObjectExport, size int32, uAsset *FPackageFileSummary) interface{} {
 		// TODO Figure out
 		parser.Read(24)
 		return parser.ReadFPackageIndex(uAsset.Imports, uAsset.Exports)
@@ -80,7 +81,7 @@ type ClassType struct {
 	Value interface{} `json:"value"`
 }
 
-func (parser *PakParser) ReadClass(export *FObjectExport, size int32, uAsset *FPackageFileSummary) (interface{}, bool) {
+func (parser *PakParser) ReadClass(ctx context.Context, export *FObjectExport, size int32, uAsset *FPackageFileSummary) (interface{}, bool) {
 	var className string
 
 	if classNameTemp := export.TemplateIndex.ClassName(); classNameTemp != nil {
@@ -98,7 +99,7 @@ func (parser *PakParser) ReadClass(export *FObjectExport, size int32, uAsset *FP
 	}
 
 	if resolver != nil {
-		value := resolver(parser, export, size, uAsset)
+		value := resolver(ctx, parser, export, size, uAsset)
 
 		if value != nil {
 			return value, true
@@ -106,7 +107,7 @@ func (parser *PakParser) ReadClass(export *FObjectExport, size int32, uAsset *FP
 	}
 
 	// TODO Read types correctly
-	log.Warningf("Unread Class Type [%d]: %s", size, trimmedType)
+	log.Ctx(ctx).Warn().Msgf("Unread Class Type [%d]: %s", size, trimmedType)
 	// fmt.Println(utils.HexDump(data[offset:]))
 	if size > 0 {
 		parser.Read(size)

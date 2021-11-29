@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"math"
 	"strings"
 )
@@ -113,11 +114,11 @@ func (parser *PakParser) ReadFText() *FText {
 	return &text
 }
 
-func (parser *PakParser) ReadFPropertyTagLoop(uAsset *FPackageFileSummary) []*FPropertyTag {
+func (parser *PakParser) ReadFPropertyTagLoop(ctx context.Context, uAsset *FPackageFileSummary) []*FPropertyTag {
 	properties := make([]*FPropertyTag, 0)
 
 	for {
-		property := parser.ReadFPropertyTag(uAsset, true, 0)
+		property := parser.ReadFPropertyTag(ctx, uAsset, true, 0)
 
 		if property == nil {
 			break

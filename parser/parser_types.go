@@ -1,15 +1,19 @@
 package parser
 
 import (
-	"fmt"
+	"context"
 	"runtime/debug"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
-func (parser *PakParser) ProcessPak(parseFile func(string) bool, handleEntry func(string, *PakEntrySet, *PakFile)) {
-	pak := parser.Parse()
+func (parser *PakParser) ProcessPak(ctx context.Context, parseFile func(string) bool, handleEntry func(string, *PakEntrySet, *PakFile)) {
+	pak := parser.Parse(ctx)
+
+	if pak == nil {
+		return
+	}
 
 	summaries := make(map[string]*FPackageFileSummary, 0)
 
@@ -25,7 +29,7 @@ func (parser *PakParser) ProcessPak(parseFile func(string) bool, handleEntry fun
 
 		if strings.HasSuffix(trimmed, "uasset") {
 			offset := record.FileOffset + int64(pak.Footer.HeaderSize())
-			log.Infof("Reading Summary: %d [%x-%x]: %s\n", j, offset, offset+record.FileSize, trimmed)
+			log.Ctx(ctx).Info().Msgf("Reading Summary: %d [%x-%x]: %s", j, offset, offset+record.FileSize, trimmed)
 			summaries[trimmed[0:strings.Index(trimmed, ".uasset")]] = record.ReadUAsset(pak, parser)
 			summaries[trimmed[0:strings.Index(trimmed, ".uasset")]].Record = record
 		}
@@ -47,23 +51,22 @@ func (parser *PakParser) ProcessPak(parseFile func(string) bool, handleEntry fun
 			offset := record.FileOffset + int64(pak.Footer.HeaderSize())
 
 			if !ok {
-				log.Errorf("Unable to read record. Missing uasset: %d [%x-%x]: %s\n", j, offset, offset+record.FileSize, trimmed)
+				log.Ctx(ctx).Error().Msgf("Unable to read record. Missing uasset: %d [%x-%x]: %s", j, offset, offset+record.FileSize, trimmed)
 				continue
 			}
 
-			log.Infof("Reading Record: %d [%x-%x]: %s\n", j, offset, offset+record.FileSize, trimmed)
+			log.Ctx(ctx).Info().Msgf("Reading Record: %d [%x-%x]: %s", j, offset, offset+record.FileSize, trimmed)
 
 			output := make(chan map[*FObjectExport]*ExportData)
 
 			go func() {
 				defer func() {
 					if err := recover(); err != nil {
-						log.Errorf("error parsing record: %v", err)
-						fmt.Println(string(debug.Stack()))
+						log.Ctx(ctx).Error().Str("stack", string(debug.Stack())).Msgf("error parsing record: %v", err)
 						output <- make(map[*FObjectExport]*ExportData)
 					}
 				}()
-				output <- record.ReadUExp(pak, parser, summary)
+				output <- record.ReadUExp(ctx, pak, parser, summary)
 			}()
 
 			exports := <-output

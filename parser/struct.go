@@ -1,7 +1,8 @@
 package parser
 
 import (
-	log "github.com/sirupsen/logrus"
+	"context"
+	"github.com/rs/zerolog/log"
 	"strings"
 )
 
@@ -122,7 +123,7 @@ type StructType struct {
 	Value interface{} `json:"value"`
 }
 
-func (parser *PakParser) ReadStruct(property *StructProperty, size int32, uAsset *FPackageFileSummary, depth int) (interface{}, bool) {
+func (parser *PakParser) ReadStruct(ctx context.Context, property *StructProperty, size int32, uAsset *FPackageFileSummary, depth int) (interface{}, bool) {
 	trimmedType := strings.Trim(property.Type, "\x00")
 
 	resolver, ok := structResolvers[trimmedType]
@@ -139,7 +140,7 @@ func (parser *PakParser) ReadStruct(property *StructProperty, size int32, uAsset
 		}
 	}
 
-	log.Warningf("%sUnread StructProperty Type [%d]: %s", d(depth), size, trimmedType)
+	log.Ctx(ctx).Warn().Msgf("%sUnread StructProperty Type [%d]: %s", d(depth), size, trimmedType)
 	if size > 0 {
 		parser.Read(size)
 	}

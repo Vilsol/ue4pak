@@ -52,11 +52,12 @@ type PakExportSet struct {
 }
 
 type FPakInfo struct {
-	Magic         uint32 `json:"magic"`
-	Version       uint32 `json:"version"`
-	IndexOffset   uint64 `json:"index_offset"`
-	IndexSize     uint64 `json:"index_size"`
-	IndexSHA1Hash []byte `json:"index_sha_1_hash"`
+	Magic           uint32 `json:"magic"`
+	Version         uint32 `json:"version"`
+	IndexOffset     uint64 `json:"index_offset"`
+	IndexSize       uint64 `json:"index_size"`
+	IndexSHA1Hash   []byte `json:"index_sha_1_hash"`
+	CompressionType string `json:"compression_type"`
 }
 
 type FPakIndex struct {

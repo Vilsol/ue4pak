@@ -1,7 +1,8 @@
 package parser
 
 import (
-	log "github.com/sirupsen/logrus"
+	"context"
+	"github.com/rs/zerolog/log"
 	"github.com/spate/glimage"
 	"github.com/x448/float16"
 	"image"
@@ -42,7 +43,7 @@ type FByteBulkDataHeader struct {
 	OffsetInFile  int64
 }
 
-func (parser *PakParser) ReadFTexturePlatformData(bulkOffset int64) *FTexturePlatformData {
+func (parser *PakParser) ReadFTexturePlatformData(ctx context.Context, bulkOffset int64) *FTexturePlatformData {
 	data := &FTexturePlatformData{
 		SizeX:       parser.ReadInt32(),
 		SizeY:       parser.ReadInt32(),
@@ -55,13 +56,13 @@ func (parser *PakParser) ReadFTexturePlatformData(bulkOffset int64) *FTexturePla
 	data.Mips = make([]*FTexture2DMipMap, length)
 
 	for i := uint32(0); i < length; i++ {
-		data.Mips[i] = parser.ReadFTexture2DMipMap(bulkOffset)
+		data.Mips[i] = parser.ReadFTexture2DMipMap(ctx, bulkOffset)
 	}
 
 	return data
 }
 
-func (parser *PakParser) ReadFTexture2DMipMap(bulkOffset int64) *FTexture2DMipMap {
+func (parser *PakParser) ReadFTexture2DMipMap(ctx context.Context, bulkOffset int64) *FTexture2DMipMap {
 	cooked := parser.ReadInt32()
 
 	mipMap := &FTexture2DMipMap{
@@ -72,7 +73,7 @@ func (parser *PakParser) ReadFTexture2DMipMap(bulkOffset int64) *FTexture2DMipMa
 	}
 
 	if cooked != 1 {
-		log.Errorf("Uncooked FTexture2DMipMap: %s", parser.ReadString())
+		log.Ctx(ctx).Error().Msgf("Uncooked FTexture2DMipMap: %s", parser.ReadString())
 		return nil
 	}
 
@@ -107,7 +108,7 @@ func (parser *PakParser) ReadFByteBulkDataHeader() *FByteBulkDataHeader {
 	}
 }
 
-func (texture *Texture2D) ToImage() image.Image {
+func (texture *Texture2D) ToImage(ctx context.Context) image.Image {
 	mipMap := texture.Textures[0].Mips[0]
 
 	switch strings.Trim(texture.Textures[0].PixelFormat, "\x00") {
@@ -124,7 +125,7 @@ func (texture *Texture2D) ToImage() image.Image {
 	case "PF_FloatRGBA":
 		return DecodeFloatRGBA(mipMap.Data.Data, mipMap.SizeX, mipMap.SizeY)
 	default:
-		log.Errorf("Unknown Texture2D pixel format: %s", strings.Trim(texture.Textures[0].PixelFormat, "\x00"))
+		log.Ctx(ctx).Error().Msgf("Unknown Texture2D pixel format: %s", strings.Trim(texture.Textures[0].PixelFormat, "\x00"))
 		return nil
 	}
 }

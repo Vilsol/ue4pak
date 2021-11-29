@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -26,13 +27,12 @@ func init() {
 var classTreeCmd = &cobra.Command{
 	Use:   "class-tree",
 	Short: "Read paks and output their class trees",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		color.NoColor = false
 
 		paks, err := filepath.Glob(cmd.Flag("pak").Value.String())
-
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		patterns := make([]glob.Glob, len(*assets))
@@ -43,11 +43,12 @@ var classTreeCmd = &cobra.Command{
 		results := make(map[string]map[string]string, 0)
 
 		open, err := os.OpenFile("much-data.txt", os.O_WRONLY|os.O_CREATE, 0644)
-
-		fmt.Println(err)
+		if err != nil {
+			return err
+		}
 
 		for _, f := range paks {
-			fmt.Println("Parsing file:", f)
+			log.Info().Msgf("Parsing file: %s", f)
 
 			file, err := os.OpenFile(f, os.O_RDONLY, 0644)
 
@@ -55,8 +56,10 @@ var classTreeCmd = &cobra.Command{
 				panic(err)
 			}
 
+			ctx := log.Logger.WithContext(cmd.Context())
+
 			p := parser.NewParser(file)
-			p.ProcessPak(nil, func(_ string, entry *parser.PakEntrySet, _ *parser.PakFile) {
+			p.ProcessPak(ctx, nil, func(_ string, entry *parser.PakEntrySet, _ *parser.PakFile) {
 				for _, export := range entry.Exports {
 					open.WriteString(fmt.Sprintf("Class: %s%s\n", trim(export.Export.ObjectName), BuildClassTree(export.Export.ClassIndex)))
 					open.WriteString(fmt.Sprintf("Super: %s%s\n", trim(export.Export.ObjectName), BuildSuperTree(export.Export.SuperIndex)))
@@ -88,11 +91,7 @@ var classTreeCmd = &cobra.Command{
 			panic("Unknown output format: " + *format)
 		}
 
-		err = ioutil.WriteFile(*output, resultBytes, 0644)
-
-		if err != nil {
-			panic(err)
-		}
+		return ioutil.WriteFile(*output, resultBytes, 0644)
 	},
 }
 

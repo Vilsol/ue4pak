@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/fatih/color v1.13.0
 	github.com/gobwas/glob v0.2.3
-	github.com/sirupsen/logrus v1.8.1
+	github.com/rs/zerolog v1.26.0
 	github.com/spate/glimage v0.0.0-20200505055513-fbdcc60a65e5
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.9.0

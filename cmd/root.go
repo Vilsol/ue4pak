@@ -1,11 +1,12 @@
 package cmd
 
 import (
-	"fmt"
+	"github.com/rs/zerolog"
 	"os"
+	"time"
 
 	_ "github.com/Vilsol/ue4pak/parser/games/satisfactory"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -19,17 +20,17 @@ var rootCmd = &cobra.Command{
 	Use:   "ue4pak",
 	Short: "ue4pak parses and extracts data from UE4 Pak files",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		level, err := log.ParseLevel(LogLevel)
-
+		level, err := zerolog.ParseLevel(LogLevel)
 		if err != nil {
-			panic(err)
+			log.Err(err).Msg("Invalid log level")
 		}
 
-		log.SetFormatter(&log.TextFormatter{
-			ForceColors: ForceColors,
-		})
-		log.SetOutput(os.Stdout)
-		log.SetLevel(level)
+		zerolog.SetGlobalLevel(level)
+
+		log.Logger = zerolog.New(zerolog.ConsoleWriter{
+			Out:        os.Stdout,
+			TimeFormat: time.RFC3339,
+		}).With().Timestamp().Logger()
 
 		viper.Set("NoPreload", NoPreload)
 	},
@@ -37,7 +38,7 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		log.Error().Msg(err.Error())
 		os.Exit(1)
 	}
 }

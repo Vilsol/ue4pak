@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/Vilsol/ue4pak/parser"
 	"github.com/fatih/color"
+	"github.com/rs/zerolog/log"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -21,7 +22,7 @@ func TestParseAllAsFiles(t *testing.T) {
 	}
 
 	for _, f := range paks {
-		fmt.Println("Parsing file:", f)
+		log.Info().Msgf("Parsing file: %s", f)
 
 		file, err := os.OpenFile(f, os.O_RDONLY, 0644)
 
@@ -72,7 +73,7 @@ func TestParseAllAsBytes(t *testing.T) {
 	}
 
 	for _, f := range paks {
-		fmt.Println("Parsing file:", f)
+		log.Info().Msgf("Parsing file: %s", f)
 
 		data, err := ioutil.ReadFile(f)
 

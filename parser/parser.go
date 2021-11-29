@@ -1,14 +1,16 @@
 package parser
 
 import (
+	"compress/zlib"
 	"fmt"
 	"github.com/spf13/viper"
 )
 
 type PakParser struct {
-	reader  PakReader
-	tracker *readTracker
-	preload []byte
+	reader     PakReader
+	tracker    *readTracker
+	preload    []byte
+	baseReader PakReader
 }
 
 type readTracker struct {
@@ -99,4 +101,25 @@ func (parser *PakParser) Read(n int32) []byte {
 	}
 
 	return buffer
+}
+
+func (parser *PakParser) StartCompression(method uint32) {
+	if method != 1 {
+		panic(fmt.Sprintf("unknown compression method: %d", method))
+	}
+
+	parser.baseReader = parser.reader
+
+	zlibReader, err := zlib.NewReader(parser.baseReader)
+	if err != nil {
+		panic(err)
+	}
+
+	parser.reader = &PakZlibReader{
+		Reader: zlibReader,
+	}
+}
+
+func (parser *PakParser) StopCompression() {
+	parser.reader = parser.baseReader
 }

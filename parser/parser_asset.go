@@ -1,7 +1,8 @@
 package parser
 
 import (
-	log "github.com/sirupsen/logrus"
+	"context"
+	"github.com/rs/zerolog/log"
 	"strings"
 )
 
@@ -11,7 +12,15 @@ func (record *FPakEntry) ReadUAsset(pak *PakFile, parser *PakParser) *FPackageFi
 	headerSize := int64(pak.Footer.HeaderSize())
 
 	parser.Seek(headerSize+int64(record.FileOffset), 0)
-	parser.Preload(int32(record.FileSize))
+
+	if record.CompressionMethod == 1 {
+		// TODO
+		parser.Read(23)
+
+		parser.StartCompression(record.CompressionMethod)
+	}
+
+	parser.Preload(int32(record.UncompressedSize - 1))
 
 	tag := parser.ReadInt32()
 	legacyFileVersion := parser.ReadInt32()
@@ -22,7 +31,7 @@ func (record *FPakEntry) ReadUAsset(pak *PakFile, parser *PakParser) *FPackageFi
 	// TODO custom_version_container: Vec<FCustomVersion>
 	parser.Read(4)
 
-	if pak.Footer.Version >= 9 {
+	if pak.Footer.Version >= 9 && record.CompressionMethod == 0 {
 		// TODO Unknown bytes
 		parser.Read(3)
 	}
@@ -139,6 +148,10 @@ func (record *FPakEntry) ReadUAsset(pak *PakFile, parser *PakParser) *FPackageFi
 
 	// TODO Bunch of unknown bytes at the end
 
+	if record.CompressionMethod == 1 {
+		parser.StopCompression()
+	}
+
 	return &FPackageFileSummary{
 		Tag:                         tag,
 		LegacyFileVersion:           legacyFileVersion,
@@ -178,7 +191,7 @@ func (record *FPakEntry) ReadUAsset(pak *PakFile, parser *PakParser) *FPackageFi
 	}
 }
 
-func (record *FPakEntry) ReadUExp(pak *PakFile, parser *PakParser, uAsset *FPackageFileSummary) map[*FObjectExport]*ExportData {
+func (record *FPakEntry) ReadUExp(ctx context.Context, pak *PakFile, parser *PakParser, uAsset *FPackageFileSummary) map[*FObjectExport]*ExportData {
 	// Skip UE4 pak header
 	// TODO Find out what's in the pak header
 	headerSize := int64(pak.Footer.HeaderSize())
@@ -189,7 +202,7 @@ func (record *FPakEntry) ReadUExp(pak *PakFile, parser *PakParser, uAsset *FPack
 
 	for _, export := range uAsset.Exports {
 		offset := headerSize + record.FileOffset + (export.SerialOffset - int64(uAsset.TotalHeaderSize))
-		log.Debugf("Reading export [%x]: %#v", offset, export.TemplateIndex.Reference)
+		log.Ctx(ctx).Debug().Msgf("Reading export [%x]: %#v", offset, export.TemplateIndex.Reference)
 		parser.Seek(offset, 0)
 
 		// fmt.Println(utils.HexDump(parser.Read(int32(export.SerialSize))))
@@ -202,7 +215,7 @@ func (record *FPakEntry) ReadUExp(pak *PakFile, parser *PakParser, uAsset *FPack
 			parser.Read(3)
 		}
 
-		properties := parser.ReadFPropertyTagLoop(uAsset)
+		properties := parser.ReadFPropertyTagLoop(ctx, uAsset)
 
 		parser.preload = nil
 		if int64(tracker.bytesRead) < export.SerialSize {
@@ -217,12 +230,12 @@ func (record *FPakEntry) ReadUExp(pak *PakFile, parser *PakParser, uAsset *FPack
 			preloadSize := len(parser.preload)
 			if preloadSize > 4 {
 				var parsed bool
-				data, parsed = parser.ReadClass(export, int32(preloadSize), uAsset)
+				data, parsed = parser.ReadClass(ctx, export, int32(preloadSize), uAsset)
 
 				if !parsed {
 					if className := export.TemplateIndex.ClassName(); className != nil {
 						// fmt.Println(utils.HexDump(parser.preload))
-						log.Warningf("Unknown export class type (%s)[%d]: %s", strings.Trim(export.ObjectName, "\x00"), preloadSize, strings.Trim(*className, "\x00"))
+						log.Ctx(ctx).Warn().Msgf("Unknown export class type (%s)[%d]: %s", strings.Trim(export.ObjectName, "\x00"), preloadSize, strings.Trim(*className, "\x00"))
 					}
 				}
 			}
@@ -237,7 +250,7 @@ func (record *FPakEntry) ReadUExp(pak *PakFile, parser *PakParser, uAsset *FPack
 	return exports
 }
 
-func (parser *PakParser) ReadFPropertyTag(uAsset *FPackageFileSummary, readData bool, depth int) *FPropertyTag {
+func (parser *PakParser) ReadFPropertyTag(ctx context.Context, uAsset *FPackageFileSummary, readData bool, depth int) *FPropertyTag {
 	name := parser.ReadFName(uAsset.Names)
 
 	if strings.Trim(name, "\x00") == "None" {
@@ -248,7 +261,7 @@ func (parser *PakParser) ReadFPropertyTag(uAsset *FPackageFileSummary, readData 
 	size := parser.ReadInt32()
 	arrayIndex := parser.ReadInt32()
 
-	log.Tracef("%sReading Property %s (%s)[%d]", d(depth), strings.Trim(name, "\x00"), strings.Trim(propertyType, "\x00"), size)
+	log.Ctx(ctx).Trace().Msgf("%sReading Property %s (%s)[%d]", d(depth), strings.Trim(name, "\x00"), strings.Trim(propertyType, "\x00"), size)
 
 	var tagData interface{}
 
@@ -259,7 +272,7 @@ func (parser *PakParser) ReadFPropertyTag(uAsset *FPackageFileSummary, readData 
 			Guid: parser.ReadFGuid(),
 		}
 
-		log.Tracef("%sStructProperty Type: %s", d(depth), tagData.(*StructProperty).Type)
+		log.Ctx(ctx).Trace().Msgf("%sStructProperty Type: %s", d(depth), tagData.(*StructProperty).Type)
 		break
 	case "BoolProperty":
 		tagData = parser.Read(1)[0] != 0
@@ -294,10 +307,10 @@ func (parser *PakParser) ReadFPropertyTag(uAsset *FPackageFileSummary, readData 
 	if readData && size > 0 {
 		parser.Preload(size)
 		tracker := parser.TrackRead()
-		tag = parser.ReadTag(size, uAsset, propertyType, tagData, &name, depth)
+		tag = parser.ReadTag(ctx, size, uAsset, propertyType, tagData, &name, depth)
 
 		if tracker.bytesRead != size {
-			log.Warningf("%sProperty not read correctly %s (%s)[%#v]: %d read out of %d",
+			log.Ctx(ctx).Warn().Msgf("%sProperty not read correctly %s (%s)[%#v]: %d read out of %d",
 				d(depth),
 				strings.Trim(name, "\x00"),
 				strings.Trim(propertyType, "\x00"),
@@ -326,7 +339,7 @@ func (parser *PakParser) ReadFPropertyTag(uAsset *FPackageFileSummary, readData 
 	}
 }
 
-func (parser *PakParser) ReadTag(size int32, uAsset *FPackageFileSummary, propertyType string, tagData interface{}, name *string, depth int) interface{} {
+func (parser *PakParser) ReadTag(ctx context.Context, size int32, uAsset *FPackageFileSummary, propertyType string, tagData interface{}, name *string, depth int) interface{} {
 	var tag interface{}
 	switch strings.Trim(propertyType, "\x00") {
 	case "FloatProperty":
@@ -339,7 +352,7 @@ func (parser *PakParser) ReadTag(size int32, uAsset *FPackageFileSummary, proper
 		var innerTagData *FPropertyTag
 
 		if arrayTypes == "StructProperty" {
-			innerTagData = parser.ReadFPropertyTag(uAsset, false, depth+1)
+			innerTagData = parser.ReadFPropertyTag(ctx, uAsset, false, depth+1)
 		}
 
 		values := make([]interface{}, valueCount)
@@ -352,10 +365,10 @@ func (parser *PakParser) ReadTag(size int32, uAsset *FPackageFileSummary, proper
 				}
 				break
 			case "StructProperty":
-				log.Tracef("%sReading Array StructProperty: %s", d(depth), strings.Trim(innerTagData.TagData.(*StructProperty).Type, "\x00"))
+				log.Ctx(ctx).Trace().Msgf("%sReading Array StructProperty: %s", d(depth), strings.Trim(innerTagData.TagData.(*StructProperty).Type, "\x00"))
 				values[i] = &ArrayStructProperty{
 					InnerTagData: innerTagData,
-					Properties:   parser.ReadTag(-1, uAsset, arrayTypes, innerTagData.TagData, nil, depth+1),
+					Properties:   parser.ReadTag(ctx, -1, uAsset, arrayTypes, innerTagData.TagData, nil, depth+1),
 				}
 				break
 			case "ObjectProperty":
@@ -417,12 +430,12 @@ func (parser *PakParser) ReadTag(size int32, uAsset *FPackageFileSummary, proper
 		break
 	case "StructProperty":
 		if tagData == nil {
-			log.Tracef("%sReading Generic StructProperty", d(depth))
+			log.Ctx(ctx).Trace().Msgf("%sReading Generic StructProperty", d(depth))
 		} else {
-			log.Tracef("%sReading StructProperty: %s", d(depth), strings.Trim(tagData.(*StructProperty).Type, "\x00"))
+			log.Ctx(ctx).Trace().Msgf("%sReading StructProperty: %s", d(depth), strings.Trim(tagData.(*StructProperty).Type, "\x00"))
 
 			if structData, ok := tagData.(*StructProperty); ok {
-				result, success := parser.ReadStruct(structData, size, uAsset, depth)
+				result, success := parser.ReadStruct(ctx, structData, size, uAsset, depth)
 
 				if success {
 					return &StructType{
@@ -436,7 +449,7 @@ func (parser *PakParser) ReadTag(size int32, uAsset *FPackageFileSummary, proper
 		properties := make([]*FPropertyTag, 0)
 
 		for {
-			property := parser.ReadFPropertyTag(uAsset, true, depth+1)
+			property := parser.ReadFPropertyTag(ctx, uAsset, true, depth+1)
 
 			if property == nil {
 				break
@@ -535,18 +548,18 @@ func (parser *PakParser) ReadTag(size int32, uAsset *FPackageFileSummary, proper
 
 		if strings.Trim(keyType, "\x00") == "StructProperty" && keyData == nil {
 			parser.Read(size)
-			log.Warningf("%sSkipping MapProperty [%s] %s -> %s", d(depth), strings.Trim(*name, "\x00"), strings.Trim(keyType, "\x00"), strings.Trim(valueType, "\x00"))
+			log.Ctx(ctx).Warn().Msgf("%sSkipping MapProperty [%s] %s -> %s", d(depth), strings.Trim(*name, "\x00"), strings.Trim(keyType, "\x00"), strings.Trim(valueType, "\x00"))
 			break
 		}
 
-		log.Tracef("%sReading MapProperty [%d]: %s -> %s", d(depth), size, strings.Trim(keyType, "\x00"), strings.Trim(valueType, "\x00"))
+		log.Ctx(ctx).Trace().Msgf("%sReading MapProperty [%d]: %s -> %s", d(depth), size, strings.Trim(keyType, "\x00"), strings.Trim(valueType, "\x00"))
 
 		numKeysToRemove := parser.ReadUint32()
 
 		if numKeysToRemove != 0 {
 			// TODO Read MapProperty where numKeysToRemove != 0
 			parser.Read(size - 4)
-			log.Warningf("%sSkipping MapProperty [%s] Remove Key Count: %d", d(depth), strings.Trim(*name, "\x00"), numKeysToRemove)
+			log.Ctx(ctx).Warn().Msgf("%sSkipping MapProperty [%s] Remove Key Count: %d", d(depth), strings.Trim(*name, "\x00"), numKeysToRemove)
 			break
 		}
 
@@ -554,15 +567,15 @@ func (parser *PakParser) ReadTag(size int32, uAsset *FPackageFileSummary, proper
 
 		results := make([]*MapPropertyEntry, num)
 		for i := int32(0); i < num; i++ {
-			key := parser.ReadTag(8, uAsset, keyType, keyData, nil, depth+1)
+			key := parser.ReadTag(ctx, 8, uAsset, keyType, keyData, nil, depth+1)
 
 			if key == nil {
 				parser.Read(size - 8)
-				log.Warningf("%sSkipping MapProperty [%s]: nil key", d(depth), strings.Trim(*name, "\x00"))
+				log.Ctx(ctx).Warn().Msgf("%sSkipping MapProperty [%s]: nil key", d(depth), strings.Trim(*name, "\x00"))
 				break
 			}
 
-			value := parser.ReadTag(-4, uAsset, valueType, valueData, nil, depth+1)
+			value := parser.ReadTag(ctx, -4, uAsset, valueType, valueData, nil, depth+1)
 
 			results[i] = &MapPropertyEntry{
 				Key:   key,
@@ -573,7 +586,7 @@ func (parser *PakParser) ReadTag(size int32, uAsset *FPackageFileSummary, proper
 		tag = results
 		break
 	default:
-		log.Debugf("%sUnread Tag Type: %s", d(depth), strings.Trim(propertyType, "\x00"))
+		log.Ctx(ctx).Debug().Msgf("%sUnread Tag Type: %s", d(depth), strings.Trim(propertyType, "\x00"))
 		parser.Read(size)
 		break
 	}

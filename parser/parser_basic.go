@@ -21,6 +21,21 @@ func (parser *PakParser) ReadString() string {
 	return string(parser.Read(stringLength))
 }
 
+func (parser *PakParser) ReadStringNull() string {
+	result := make([]byte, 0)
+
+	for {
+		b := parser.Read(1)[0]
+		if b == 0x00 {
+			break
+		} else {
+			result = append(result, b)
+		}
+	}
+
+	return string(result)
+}
+
 func (parser *PakParser) ReadFloat32() float32 {
 	value := math.Float32frombits(parser.ReadUint32())
 	assertFloat32IsFinite(value)

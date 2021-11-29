@@ -1,12 +1,13 @@
 package parser
 
 import (
-	"encoding/binary"
+	"context"
+	"github.com/rs/zerolog/log"
 )
 
 const INDEX_NONE = int64(-1)
 
-func (parser *PakParser) Parse() *PakFile {
+func (parser *PakParser) Parse(ctx context.Context) *PakFile {
 	// Find magic number
 	magicOffset := int64(-44)
 
@@ -28,14 +29,23 @@ func (parser *PakParser) Parse() *PakFile {
 
 	// Seek and read the footer of the file
 	parser.Seek(magicOffset, 2)
-	footer := parser.Read(int32(magicOffset * -1))
 
-	pakFooter := &FPakInfo{
-		Magic:         binary.LittleEndian.Uint32(footer[0:4]),
-		Version:       binary.LittleEndian.Uint32(footer[4:8]),
-		IndexOffset:   binary.LittleEndian.Uint64(footer[8:16]),
-		IndexSize:     binary.LittleEndian.Uint64(footer[16:24]),
-		IndexSHA1Hash: footer[24:44],
+	pakFooter := &FPakInfo{}
+
+	pakFooter.Magic = parser.ReadUint32()
+	pakFooter.Version = parser.ReadUint32()
+	pakFooter.IndexOffset = parser.ReadUint64()
+	pakFooter.IndexSize = parser.ReadUint64()
+	pakFooter.IndexSHA1Hash = parser.Read(20)
+
+	// Skip 1 byte
+	parser.Read(1)
+
+	pakFooter.CompressionType = parser.ReadStringNull()
+
+	if pakFooter.CompressionType != "" && pakFooter.CompressionType != "Zlib" {
+		log.Ctx(ctx).Error().Msgf("Compression method unsupported: %s", pakFooter.CompressionType)
+		return nil
 	}
 
 	// Seek and read the index of the file

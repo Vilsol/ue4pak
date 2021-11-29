@@ -1,11 +1,13 @@
 package parser
 
+import "context"
+
 // https://github.com/SatisfactoryModdingUE/UnrealEngine/blob/4.22-CSS/Engine/Source/Runtime/Engine/Classes/Engine/DataTable.h#L56
 type UDataTable struct {
 	Values map[string][]*FPropertyTag `json:"values"`
 }
 
-func (parser *PakParser) ReadUDataTable(uAsset *FPackageFileSummary) *UDataTable {
+func (parser *PakParser) ReadUDataTable(ctx context.Context, uAsset *FPackageFileSummary) *UDataTable {
 	// Unknown
 	parser.Read(4)
 
@@ -15,7 +17,7 @@ func (parser *PakParser) ReadUDataTable(uAsset *FPackageFileSummary) *UDataTable
 
 	for i := uint32(0); i < count; i++ {
 		name := parser.ReadFName(uAsset.Names)
-		values[name] = parser.ReadFPropertyTagLoop(uAsset)
+		values[name] = parser.ReadFPropertyTagLoop(ctx, uAsset)
 	}
 
 	return &UDataTable{
