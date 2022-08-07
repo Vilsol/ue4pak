@@ -57,36 +57,23 @@ func (parser *PakParser) ProcessPak(ctx context.Context, parseFile func(string) 
 
 			log.Ctx(ctx).Info().Msgf("Reading Record: %d [%x-%x]: %s", j, offset, offset+record.FileSize, trimmed)
 
-			output := make(chan map[*FObjectExport]*ExportData)
+			output := make(chan []PakExportSet)
 
 			go func() {
 				defer func() {
 					if err := recover(); err != nil {
 						log.Ctx(ctx).Error().Str("stack", string(debug.Stack())).Msgf("error parsing record: %v", err)
-						output <- make(map[*FObjectExport]*ExportData)
+						output <- make([]PakExportSet, 0)
 					}
 				}()
 				output <- record.ReadUExp(ctx, pak, parser, summary)
 			}()
 
-			exports := <-output
-
-			exportSet := make([]PakExportSet, len(exports))
-
-			i := 0
-			for export, data := range exports {
-				exportSet[i] = PakExportSet{
-					Export: export,
-					Data:   data,
-				}
-				i++
-			}
-
 			if handleEntry != nil {
 				handleEntry(trimmed, &PakEntrySet{
 					ExportRecord: record,
 					Summary:      summary,
-					Exports:      exportSet,
+					Exports:      <-output,
 				}, pak)
 			}
 		}
