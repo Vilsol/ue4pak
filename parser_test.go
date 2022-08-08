@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/Vilsol/ue4pak/parser"
 	"github.com/fatih/color"
@@ -31,7 +32,7 @@ func TestParseAllAsFiles(t *testing.T) {
 		}
 
 		p := parser.NewParser(file)
-		pak := p.Parse()
+		pak := p.Parse(context.Background())
 
 		summaries := make(map[string]*parser.FPackageFileSummary, 0)
 
@@ -57,7 +58,7 @@ func TestParseAllAsFiles(t *testing.T) {
 
 				fmt.Printf("Reading Record: %d: %#v\n", j, record)
 
-				record.ReadUExp(pak, p, summary)
+				record.ReadUExp(context.Background(), pak, p, summary)
 			}
 		}
 	}
@@ -86,7 +87,7 @@ func TestParseAllAsBytes(t *testing.T) {
 		}
 
 		p := parser.NewParser(reader)
-		pak := p.Parse()
+		pak := p.Parse(context.Background())
 
 		summaries := make(map[string]*parser.FPackageFileSummary, 0)
 
@@ -112,7 +113,7 @@ func TestParseAllAsBytes(t *testing.T) {
 
 				fmt.Printf("Reading Record: %d: %#v\n", j, record)
 
-				record.ReadUExp(pak, p, summary)
+				record.ReadUExp(context.Background(), pak, p, summary)
 			}
 		}
 	}

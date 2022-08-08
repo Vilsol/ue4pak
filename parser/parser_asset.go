@@ -191,16 +191,16 @@ func (record *FPakEntry) ReadUAsset(pak *PakFile, parser *PakParser) *FPackageFi
 	}
 }
 
-func (record *FPakEntry) ReadUExp(ctx context.Context, pak *PakFile, parser *PakParser, uAsset *FPackageFileSummary) map[*FObjectExport]*ExportData {
+func (record *FPakEntry) ReadUExp(ctx context.Context, pak *PakFile, parser *PakParser, uAsset *FPackageFileSummary) []PakExportSet {
 	// Skip UE4 pak header
 	// TODO Find out what's in the pak header
 	headerSize := int64(pak.Footer.HeaderSize())
 
-	exports := make(map[*FObjectExport]*ExportData)
+	exports := make([]PakExportSet, len(uAsset.Exports))
 
 	// spew.Dump(uAsset.Names)
 
-	for _, export := range uAsset.Exports {
+	for i, export := range uAsset.Exports {
 		offset := headerSize + record.FileOffset + (export.SerialOffset - int64(uAsset.TotalHeaderSize))
 		log.Ctx(ctx).Debug().Msgf("Reading export [%x]: %#v", offset, export.TemplateIndex.Reference)
 		parser.Seek(offset, 0)
@@ -241,9 +241,12 @@ func (record *FPakEntry) ReadUExp(ctx context.Context, pak *PakFile, parser *Pak
 			}
 		}
 
-		exports[export] = &ExportData{
-			Properties: properties,
-			Data:       data,
+		exports[i] = PakExportSet{
+			Export: export,
+			Data: &ExportData{
+				Properties: properties,
+				Data:       data,
+			},
 		}
 	}
 
